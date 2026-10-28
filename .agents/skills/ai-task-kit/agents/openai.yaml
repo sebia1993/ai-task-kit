@@ -1,0 +1,6 @@
+interface:
+  display_name: "AI Task Kit"
+  short_description: "허용된 시간 제한 과제의 한국어 작업·검증 지원"
+  default_prompt: "Use $ai-task-kit for this AI-permitted practical task."
+policy:
+  allow_implicit_invocation: false

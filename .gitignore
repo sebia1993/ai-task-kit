@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.ai-task-kit/
+.venv/
+.superpowers/
+dist/
