@@ -45,7 +45,7 @@ Skill 자동 인식은 필수가 아닙니다. 파일을 직접 읽는 대체 �
 | audit | CSV/JSON 결측·중복·열·합계·고유값·날짜 검사 |
 | verify | 필수 파일·비어 있음·Python 문법·자료 형식 확인 |
 | explain | 오류를 확정하지 않고 한국어 조사 방향 제공 |
-| session | 공식 시간을 보조하는 로컬 시간 추정과 재시도 기록 |
+| retry | 시간 입력 없이 동일 오류의 실패 횟수를 수동 기록하고 반복 실패 시 접근 변경 권고 |
 | worklog | 업무 질문·답변 반영, 중요한 판단과 검증 주장 기록, 파일 변경 감지 |
 | preflight | 필수 파일·검토 후보·작업 기록 종합 점검 |
 | Cofa 웹 참고 | 기존 서버의 포트·바인딩·미리보기 점검 안내 |
@@ -61,12 +61,16 @@ python3 kit.py doctor --root /실제/과제/폴더
 python3 kit.py inspect --root /실제/과제/폴더 --json
 python3 kit.py audit --root /실제/과제/폴더 --file data/input.csv
 python3 kit.py verify --root /실제/과제/폴더 --require main.py --require report.md
+python3 kit.py retry attempt --root /실제/과제/폴더 --issue csv-error
+python3 kit.py retry status --root /실제/과제/폴더
 python3 kit.py worklog status --root /실제/과제/폴더 --json
 python3 kit.py preflight --root /실제/과제/폴더 --require main.py --require report.md
 python3 -m unittest discover -s tests -v
 ```
 
 정확한 옵션과 검사 한도는 [도구 설명](.agents/skills/ai-task-kit/references/TOOLS.md)을 참고합니다. 코드 실행 실패를 숨기기 위해 입력·공식 테스트를 바꾸지 않습니다. 지원하지 않는 자료를 억지로 읽지 않습니다.
+
+**시간 관리:** Cofa 공식 시험 화면의 타이머만 기준으로 사용합니다. 이전 `session start/status` 및 자체 남은 시간 계산 기능은 제거했습니다. `retry`는 수동 오류 횟수 기록만 수행하며 타이머나 오류를 자동 감지하지 않습니다. 기존 `.ai-task-kit/session.json`은 변경·삭제·자동 이관하지 않습니다. 새 기록은 `.ai-task-kit/retries.json`에 저장합니다.
 
 기록 기능을 쓸 때는 [요구사항·업무 질문·검증 기록 안내](.agents/skills/ai-task-kit/references/WORKFLOW.md)를, 웹 서비스 과제에서는 [Cofa 웹 실행 안내](.agents/skills/ai-task-kit/references/COFA_WEB.md)를 읽으세요. 둘 다 **필요한 상황에서만 사용하는 선택 기능**입니다. 과제 원문·비공개 파일·결과를 공개 GitHub에 올리지 않습니다. 로컬 `.ai-task-kit` 상태 폴더는 제출 산출물과 구분합니다.
 

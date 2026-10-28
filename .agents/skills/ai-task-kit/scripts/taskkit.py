@@ -20,7 +20,7 @@ import sys
 import tempfile
 import time
 
-VERSION = '1.1.0'
+VERSION = '2.0.0'
 MAX_BYTES = 8 * 1024 * 1024
 MAX_ROWS = 100_000
 MAX_COLUMNS = 1_024
@@ -414,91 +414,82 @@ def explain(args):
                   user_checkpoint='기술 수정이 업무 규칙·입력 제외·계산 기준을 바꾸면 먼저 확인하세요.')
 
 
-def state_path(root: Path) -> Path:
-    return safe_path(root, '.ai-task-kit/session.json')
+RETRY_BYTES = 32_768
 
 
-def load_state(root: Path) -> tuple[Path, dict]:
-    path = state_path(root)
+def retry_state_path(root: Path) -> Path:
+    return safe_path(root, '.ai-task-kit/retries.json')
+
+
+def load_retry_state(root: Path) -> tuple[Path, dict, bool]:
+    """Only manual retry counts, never infer or modify a legacy timer session."""
+    path = retry_state_path(root)
     if not path.exists():
-        raise KitError('세션 기록이 없습니다. 공식 남은 시간을 확인한 뒤 session start로 시작하세요.', 'UNVERIFIED')
-    s = strict_json(decoded(read_bytes(path, 32_768)))
-    fields = {'schema_version', 'root', 'started_at', 'minutes', 'reserve', 'attempts'}
-    if not isinstance(s, dict) or set(s) != fields or s['schema_version'] != 1 or s['root'] != str(root):
-        raise KitError('세션 기록의 형식 또는 과제 폴더가 맞지 않습니다. 자동 초기화하지 않았습니다.')
-    for key in ('started_at', 'minutes', 'reserve'):
-        if isinstance(s[key], bool) or not isinstance(s[key], (int, Decimal)) or not math.isfinite(float(s[key])):
-            raise KitError('세션 시간 값이 유효하지 않습니다.')
-    if not (s['started_at'] >= 0 and 0 < s['minutes'] <= 1440 and 0 <= s['reserve'] < s['minutes']):
-        raise KitError('세션 시간 범위가 유효하지 않습니다.')
-    if not isinstance(s['attempts'], dict) or any(not ISSUE.fullmatch(k) or type(v) is not int or v < 0 for k, v in s['attempts'].items()):
-        raise KitError('오류 재시도 기록이 유효하지 않습니다.')
-    return path, s
+        return path, {'schema_version': 1, 'root': str(root), 'attempts': {}}, False
+    state = strict_json(decoded(read_bytes(path, RETRY_BYTES)))
+    fields = {'schema_version', 'root', 'attempts'}
+    if (not isinstance(state, dict) or set(state) != fields or
+            type(state['schema_version']) is not int or state['schema_version'] != 1 or
+            state['root'] != str(root) or not isinstance(state['attempts'], dict)):
+        raise KitError('오류 재시도 기록의 형식 또는 과제 경로가 맞지 않습니다. 자동 덮어쓰지 않았습니다.')
+    if any(not isinstance(key, str) or not ISSUE.fullmatch(key) or
+           type(count) is not int or count < 1
+           for key, count in state['attempts'].items()):
+        raise KitError('오류 재시도 횟수 기록이 잘못됐습니다. 자동 초기화하지 않았습니다.')
+    return path, state, True
 
 
-def write_state(path: Path, state: dict, initial: bool = False):
-    """Own state only; refuse symlinks and never replace an existing initial session."""
+def write_retry_state(path: Path, state: dict):
+    """Atomic opt-in local recording, one writer only; never erase the old session."""
     if path.parent.is_symlink() or path.is_symlink():
-        raise KitError('세션 저장 경로에 링크가 있습니다. 저장하지 않았습니다.')
+        raise KitError('오류 기록 저장 경로에 링크가 있습니다. 기록하지 않았습니다.')
+    if path.exists() and not path.is_file():
+        raise KitError('오류 기록 저장 경로가 일반 파일이 아닙니다.')
     path.parent.mkdir(exist_ok=True)
-    payload = json.dumps(state, ensure_ascii=False, indent=2, allow_nan=False, default=float) + '\n'
-    if len(payload.encode('utf-8')) > 32_768:
-        raise KitError('세션 기록 크기 한도에 도달했습니다. 추가 저장을 중단합니다.')
-    if initial:
-        try:
-            with path.open('x', encoding='utf-8') as stream:
-                stream.write(payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-        except FileExistsError as exc:
-            raise KitError('기존 세션이 있습니다. 시작 시간을 초기화하지 않습니다. session status로 이어가세요.') from exc
-    else:
-        temp_name = None
-        try:
-            with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
-                                             prefix='.session-', suffix='.tmp', delete=False) as stream:
-                temp_name = stream.name
-                stream.write(payload)
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temp_name, path)
-        finally:
-            if temp_name and os.path.exists(temp_name):
-                os.unlink(temp_name)
+    payload = json.dumps(state, ensure_ascii=False, indent=2, allow_nan=False) + '\n'
+    if len(payload.encode('utf-8')) > RETRY_BYTES:
+        raise KitError('오류 기록이 32 KiB 한도를 넘었습니다. 추가 저장을 중단했습니다.')
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
+                                         prefix='.retry-', suffix='.tmp', delete=False) as stream:
+            temporary = stream.name
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if path.is_symlink():
+            raise KitError('오류 기록 파일 경로가 바뀌었습니다. 기록하지 않았습니다.')
+        os.replace(temporary, path)
+    finally:
+        if temporary and os.path.exists(temporary):
+            os.unlink(temporary)
 
 
-def session(args):
+def retry(args):
+    """Record explicit error attempts without a timer or background monitoring."""
     root = task_root(args.root)
-    if args.action == 'start':
-        if not 0 < args.minutes <= 1440 or not 0 <= args.reserve < args.minutes:
-            raise KitError('남은 시간은 1~1440분, 제출 여유 시간은 남은 시간보다 작아야 합니다.')
-        s = {'schema_version': 1, 'root': str(root), 'started_at': time.time(),
-             'minutes': args.minutes, 'reserve': args.reserve, 'attempts': {}}
-        write_state(state_path(root), s, initial=True)
-        return result('session', 'PASS', 'local_timer_estimate', '로컬 시간 추정을 시작했습니다. 공식 타이머가 우선입니다.',
-                      remaining_minutes=args.minutes, reserve_minutes=args.reserve, official_timer=False)
-    path, s = load_state(root)
-    if args.action == 'attempt':
-        if not args.issue or not ISSUE.fullmatch(args.issue):
-            raise KitError('--issue에는 영문·숫자·하이픈·밑줄의 짧은 이슈 이름을 사용하세요.')
-        count = s['attempts'].get(args.issue, 0) + 1
-        s['attempts'][args.issue] = count
-        write_state(path, s)
-        return result('session', 'UNVERIFIED' if count >= 2 else 'PASS', 'recovery_budget_only',
-                      '같은 이슈가 2회 이상 실패했습니다. 증거·가설을 바꾸거나 단순한 대안으로 전환하세요.' if count >= 2 else '실패 1회를 기록했습니다. 원인을 확인하고 최소 변경으로 재검증하세요.',
-                      attempts=count, action='CHANGE_STRATEGY' if count >= 2 else 'INVESTIGATE',
-                      limit_is_advisory=True)
-    elapsed = time.time() - float(s['started_at'])
-    if elapsed < 0:
-        return result('session', 'UNVERIFIED', 'local_timer_estimate',
-                      '시계가 뒤로 이동했습니다. 남은 시간을 추정하지 않습니다. 공식 타이머를 확인하세요.',
-                      remaining_minutes=None, mode='CHECK_OFFICIAL_TIMER')
-    remaining = max(0.0, float(s['minutes']) - elapsed / 60)
-    mode = 'STOP' if remaining <= 0 else 'VERIFY_AND_SUBMIT' if remaining <= s['reserve'] else 'IMPLEMENT'
-    return result('session', 'PASS', 'local_timer_estimate', '로컬 추정치입니다. 공식 타이머와 다르면 공식 시간을 따르세요.',
-                  remaining_minutes=round(remaining, 2), reserve_minutes=s['reserve'], mode=mode,
-                  official_timer=False)
-
+    path, state, exists = load_retry_state(root)
+    if args.action == 'status':
+        counts = state['attempts']
+        return result('retry', 'PASS' if counts else 'UNVERIFIED', 'manual_retry_counts_only',
+                      '수동 기록한 실패 횟수입니다. 오류나 공식 타이머를 자동 감지하지 않습니다.',
+                      exists=exists, counts=counts,
+                      change_strategy_issues=sorted(k for k, n in counts.items() if n >= 2),
+                      automatic_error_detection=False, timer_used=False)
+    if args.action != 'attempt' or not args.issue or not ISSUE.fullmatch(args.issue):
+        raise KitError('--issue에는 영문·숫자·하이픈·밑줄의 짧은 오류 ID를 사용하세요.')
+    issue = args.issue
+    count = state['attempts'].get(issue, 0) + 1
+    state['attempts'][issue] = count
+    write_retry_state(path, state)
+    changed = count >= 2
+    return result('retry', 'UNVERIFIED' if changed else 'PASS', 'manual_retry_counts_only',
+                  '동일 오류가 두 번 이상 기록됐습니다. 원인과 접근 방법을 다시 검토하세요.'
+                  if changed else '첫 실패를 기록했습니다. 원인을 확인한 뒤 최소 변경으로 재검사하세요.',
+                  issue=issue, attempts=count,
+                  action='CHANGE_STRATEGY' if changed else 'INVESTIGATE',
+                  automatic_error_detection=False, timer_used=False,
+                  limit_is_advisory=True)
 
 
 # A local, user-entered work record. No process execution, network requests or auto submission.
@@ -802,17 +793,14 @@ def parser():
             child.add_argument('--date-column')
         if name == 'verify':
             child.add_argument('--require', action='append', help='반복 지정 가능. 과제에서 실제 요구한 파일만 지정')
-    s = sub.add_parser('session', help='로컬 시간·재시도 기록')
-    actions = s.add_subparsers(dest='action', required=True)
-    for action in ('start', 'status', 'attempt'):
+    retries = sub.add_parser('retry', help='타이머와 무관한 동일 오류 실패 횟수의 수동 기록')
+    actions = retries.add_subparsers(dest='action', required=True)
+    for action in ('attempt', 'status'):
         child = actions.add_parser(action)
         child.add_argument('--root', required=True)
         child.add_argument('--json', action='store_true')
-        if action == 'start':
-            child.add_argument('--minutes', type=int, required=True, help='공식 타이머에 표시된 현재 남은 분')
-            child.add_argument('--reserve', type=int, default=15, help='검증·제출 확보 시간 (프로젝트 권장값)')
         if action == 'attempt':
-            child.add_argument('--issue', required=True)
+            child.add_argument('--issue', required=True, help='동일 오류를 식별할 짧은 ID')
     w = sub.add_parser('worklog', help='요구사항·업무 질문·판단·실제 관측 기록')
     acts = w.add_subparsers(dest='action', required=True)
     for action in ('requirement', 'ask', 'answer', 'apply', 'decision', 'evidence', 'status'):
@@ -864,7 +852,7 @@ def main(argv=None) -> int:
     try:
         args = parser().parse_args(raw)
         functions = {'doctor': doctor, 'inspect': inspect_project, 'audit': audit,
-                     'verify': verify, 'explain': explain, 'session': session,
+                     'verify': verify, 'explain': explain, 'retry': retry,
                      'worklog': worklog, 'preflight': preflight}
         report = functions[args.command](args)
     except KitError as exc:

@@ -74,3 +74,26 @@ python3 -S -m unittest discover -s tests -v
 검증 명령: `python -S -m unittest discover -s tests -v`. 기능은 원본 과제 파일을 자동으로 변경하지 않고, 작업 기록은 `.ai-task-kit/worklog.json`에 선택적으로 저장한다. `PASS_RECORDED_ONLY`는 사용자가 입력한 실행 결과의 상태일 뿐 독립적으로 검증한 성공 판정이 아니다. `preflight`는 제출 파일의 형식과 기록을 보조 점검하지만 에디터의 저장 완료·플랫폼의 제출 완료를 알 수 없다. 실제 서비스 화면 확인은 사람이 수행한다.
 
 본 검증은 작성자와 자동 테스트에 의한 확인이다. 독립 코드 리뷰, Cofa 플랫폼 호환성, 시험 점수 향상을 입증하지 않는다.
+
+---
+
+## 2026-10-29 시간 기능 제거·재시도 기능 분리 — v2.0.0
+
+**변경 사항:** 공식 시험 타이머와 중복되는 `session start/status`, `--minutes`/`--reserve`, 로컬 남은 시간 계산, 15분 여유시간 자동 판단을 제거했다. 오류 횟수만 독립적으로 기록하는 `retry attempt/status` 명령을 새로 추가했다. 사용자가 명시적으로 실행할 때만 `.ai-task-kit/retries.json`에 저장하며, 기존 `.ai-task-kit/session.json`은 읽기·삭제·자동 이관하지 않는다. Skill의 **공식 타이머 우선과 검증·제출 우선순위** 조언은 유지한다.
+
+| 검증 항목 | 결과 | 범위 |
+|---|---|---|
+| Linux Python 3.10 | **88/88 PASS** | 전체 unittest, GitHub Actions |
+| Linux Python 3.12 | **88/88 PASS** | 전체 unittest, GitHub Actions |
+| Linux Python 3.13 | **88/88 PASS** | 전체 unittest, GitHub Actions |
+| `retry` 사용 전 세션·시간 입력 불필요 | **PASS** | 타이머 없이 첫 오류 기록 가능 |
+| 같은 오류 2회 기록 및 오류별 독립 카운트 | **PASS** | 2회부터 `CHANGE_STRATEGY` 권고 |
+| 옛 `session` 명령·시간 옵션 거부 | **PASS** | 지원하지 않는 명령 오류로 구분 |
+| 기존 `session.json` 보존 | **PASS** | 자동 이관·원본 변경 없음 |
+| 심볼릭 링크·손상된 상태 기록 보호 | **PASS** | 해당 회귀 테스트 |
+| 실제 Cofa-Probe 환경 호환성 | **NOT RUN** | 공식 플랫폼 직접 접근·사용 검증 필요 |
+| 실제 Codex 과제 성능 향상 | **NOT RUN** | 별도 모델 실험 필요 |
+
+**실제 확인:** [GitHub Actions 88개 테스트 통과](https://github.com/sebia1993/ai-task-kit/actions/runs/40720342367). 검사 명령은 `python -S -m unittest discover -s tests -v`; Python 버전 3개에서 각각 성공했다. 다른 코드·자료 검사 기능도 이 회귀 테스트에 포함된다. 이전 버전의 테스트 및 기능에 관한 상단 내용은 **당시 이력**이고 현재 `session` CLI를 지원한다는 뜻이 아니다.
+
+**제약:** 오류는 자동 감지하지 않고 사용자가 명시한 `retry attempt` 횟수만 센다. 공식 타이머를 읽거나 자동 알림·중단을 실행하지 않는다. 레포는 실제 시험 문제·메일·결과물을 포함하지 않으며, 외부로 제출·전송하지 않는다.
