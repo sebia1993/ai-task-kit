@@ -14,12 +14,12 @@
 - 경로 이탈·심볼릭 링크·특수 파일을 읽거나 수정하지 않는가?
 - 미검증·부분 검사와 성공을 혼동하지 않는가?
 - 결측/중복/비유한 수치를 조용히 정상값으로 바꾸지 않는가?
-- 세션 재시작으로 시간이 초기화되거나 타이머가 연장되지 않는가?
+- 자체 타이머와 사용자 시간 입력을 제거했는가? 오류 재시도 기록이 독립적으로 작동하며 기존 `session.json`을 보존하는가?
 - Skill 복사본·루트 실행·한글/공백 경로에서 동일하게 작동하는가?
 
 ## Task 1: 검사 CLI
 **Files:** `kit.py`, `.agents/skills/ai-task-kit/scripts/taskkit.py`, `tests/test_kit.py`
-**Interface:** `python3 kit.py <doctor|inspect|audit|verify|explain|session|worklog|preflight> ... [--json]`; 결과 status/scope/summary/details, 종료 코드 0/1/2.
+**Interface:** `python3 kit.py <doctor|inspect|audit|verify|explain|retry|worklog|preflight> ... [--json]`; 결과 status/scope/summary/details, 종료 코드 0/1/2.
 - [ ] 경로/입력/상태 구분 회귀 테스트를 먼저 작성하고 실패 확인.
 - [ ] 읽기 전용 검사, 수치 검산, 안전한 세션 상태 저장 구현.
 - [ ] 전체 unittest 및 CLI 스모크 테스트 통과 확인.
@@ -47,6 +47,14 @@
 - [x] Cofa Browser 실행/오류 대응 참고 문서 및 한국어 오류 힌트.
 - [x] 합성 데이터 기반 자동 테스트·CI 구성.
 - [ ] 실제 Cofa 접속 및 AI 모델 과제 성능 확인 (별도 환경 필요).
+
+## Task 5: 공식 타이머와 중복되는 시간 기능 제거 (2026-10-29)
+**범위:** `session start/status`, 로컬 남은 분 계산·제출 여유 분 계산 제거. 오류 재시도 명령을 `retry attempt/status`로 독립.
+- [x] 오류 재시도 로컬 기록 구조 `.ai-task-kit/retries.json`에 분리.
+- [x] 자체 타이머 시작·남은 시간 입력 경로 제거.
+- [x] 기존 `session.json`을 그대로 보존하고 자동 이관하지 않음.
+- [x] 관련 회귀 테스트·사용 설명·Skill 지침 변경.
+- [ ] 새 버전 자동 테스트와 플랫폼 실제 사용 검증은 별도 검증 기록 확인.
 
 ## 승인과 한계
 사용자의 최신 요청은 이 설계의 구현 승인이다. 별도 PR/릴리스나 제3자 저장소 변경은 하지 않는다. 신규 빈 저장소 초기 버전만 반영한다. 실제 Cofa 접근과 모델 A/B 평가는 제공되지 않아 완료를 주장하지 않는다.
