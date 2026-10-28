@@ -72,6 +72,41 @@ class WorkflowTests(unittest.TestCase):
         self.put('out.txt', 'modified')
         self.assertEqual(self.status()['questions'][0]['state'], 'APPLIED_FILE_CHANGED')
 
+    def test_apply_accumulates_multiple_files(self):
+        self.put('first.py', 'value = 1')
+        self.put('second.py', 'value = 2')
+        self.req('first.py', 'second.py')
+        self.run_kit('worklog', 'ask', '--root', str(self.root),
+                     '--id', 'q1', '--requirement', 'r1', '--text', '기준?', status='PASS')
+        self.run_kit('worklog', 'answer', '--root', str(self.root),
+                     '--id', 'q1', '--text', '답변', '--source', '담당자', status='PASS')
+        self.run_kit('worklog', 'apply', '--root', str(self.root),
+                     '--id', 'q1', '--file', 'first.py', status='PASS')
+        self.run_kit('worklog', 'apply', '--root', str(self.root),
+                     '--id', 'q1', '--file', 'second.py', status='PASS')
+        self.assertEqual(self.status()['questions'][0]['state'], 'APPLICATION_RECORDED')
+        self.put('first.py', 'value = 3')
+        self.assertEqual(self.status()['questions'][0]['state'], 'APPLIED_FILE_CHANGED')
+        state = json.loads((self.root / '.ai-task-kit/worklog.json').read_text())
+        self.assertEqual({x['file'] for x in state['questions']['q1']['applied']},
+                         {'first.py', 'second.py'})
+
+    def test_reapply_only_updates_selected_file(self):
+        self.put('first.py', 'value = 1')
+        self.put('second.py', 'value = 2')
+        self.req('first.py', 'second.py')
+        self.run_kit('worklog', 'ask', '--root', str(self.root),
+                     '--id', 'q1', '--requirement', 'r1', '--text', '기준?', status='PASS')
+        self.run_kit('worklog', 'answer', '--root', str(self.root),
+                     '--id', 'q1', '--text', '답변', '--source', '담당자', status='PASS')
+        self.run_kit('worklog', 'apply', '--root', str(self.root), '--id', 'q1',
+                     '--file', 'first.py', '--file', 'second.py', status='PASS')
+        self.put('first.py', 'value = 3')
+        self.assertEqual(self.status()['questions'][0]['state'], 'APPLIED_FILE_CHANGED')
+        self.run_kit('worklog', 'apply', '--root', str(self.root), '--id', 'q1',
+                     '--file', 'first.py', status='PASS')
+        self.assertEqual(self.status()['questions'][0]['state'], 'APPLICATION_RECORDED')
+
     def test_declared_evidence_is_not_functional_proof(self):
         self.put('out.txt', 'original')
         self.req('out.txt')
