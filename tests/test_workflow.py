@@ -123,11 +123,10 @@ class WorkflowTests(unittest.TestCase):
             (self.root / 'link.txt').symlink_to(original)
         except OSError:
             self.skipTest('symlinks unavailable')
-        self.req('link.txt')
-        self.run_kit('worklog', 'evidence', '--root', str(self.root),
-                     '--id', 'e1', '--requirement', 'r1', '--file', 'link.txt',
-                     '--command', 'cat link.txt', '--outcome', 'PASS',
-                     '--note', 'not run', status='FAIL')
+        self.run_kit('worklog', 'requirement', '--root', str(self.root),
+                     '--id', 'r1', '--text', '요구사항',
+                     '--file', 'link.txt', status='FAIL')
+        self.assertFalse((self.root / '.ai-task-kit').exists())
 
     def test_corrupt_record_does_not_get_overwritten(self):
         self.put('.ai-task-kit/worklog.json', '{"foreign":true}')
