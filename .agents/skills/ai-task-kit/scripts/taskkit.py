@@ -708,13 +708,14 @@ def worklog(args):
         question = state['questions'].get(key)
         if question is None or not question.get('answer'):
             raise KitError('답변이 기록된 질문 ID만 반영 대상으로 지정할 수 있습니다.')
-        applied = []
+        # Merge repeated applications by path so unrelated verification records are not lost.
+        applied = {entry['file']: entry for entry in question['applied']}
         for name in dict.fromkeys(args.file):
             digest = artifact_digest(root, name)
             if digest is None:
                 raise KitError('답변 반영 파일을 읽지 못했습니다. 파일을 확인한 뒤 기록하세요.')
-            applied.append({'file': name, 'sha256': digest})
-        question['applied'] = applied
+            applied[name] = {'file': name, 'sha256': digest}
+        question['applied'] = list(applied.values())
     elif args.action == 'decision':
         if args.requirement not in state['requirements']:
             raise KitError('연결할 요구사항 ID가 없습니다.')
