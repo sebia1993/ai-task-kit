@@ -134,6 +134,14 @@ class WorkflowTests(unittest.TestCase):
                      '--id', 'r1', '--text', 'test', status='FAIL')
         self.assertEqual((self.root / '.ai-task-kit/worklog.json').read_text(), '{"foreign":true}')
 
+    def test_malformed_nested_worklog_is_fail_not_traceback(self):
+        state = {'schema_version': 1, 'root': str(self.root),
+                 'requirements': {'r1': {}}, 'questions': {},
+                 'decisions': {}, 'evidence': {}}
+        self.put('.ai-task-kit/worklog.json', json.dumps(state))
+        r = self.run_kit('worklog', 'status', '--root', str(self.root), status='FAIL')
+        self.assertIn('형식', r['summary'])
+
     def test_worklog_directory_symlink_rejected(self):
         dest = self.root / 'real'
         dest.mkdir()
@@ -161,6 +169,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn('tmp.bak', d['review_candidates'])
         self.assertFalse(d['submission_confirmed'])
         self.assertFalse(d['editor_save_confirmed'])
+        self.assertFalse(d['internal_tool_state_dir_present'])
         self.assertFalse((self.root / 'should not execute').exists())
 
     def test_preflight_reports_pending_questions(self):
