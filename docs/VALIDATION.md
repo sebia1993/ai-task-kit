@@ -49,3 +49,28 @@ python3 -S -m unittest discover -s tests -v
 | 독립 외부 리뷰어의 코드 리뷰 | **NOT RUN — 작성자 자가 리뷰만 수행** |
 
 이 환경에는 Codex CLI 및 Cofa 시험 세션이 제공되지 않아 위 검증을 수행하지 않았다. [평가 시나리오](../evals/SCENARIOS.md)에 실행 방법을 남겼다. 시험 사용 승인·합격률 개선·현장 안정성을 주장하지 않는다.
+
+---
+
+## 2026-10-29 보강 검증 — v1.1.0 기능 브랜치
+
+기존 v1.0.0 검증 내용은 당시 수행 기록으로 보존한다. 아래는 **새 기능을 포함해 별도로 실행한** GitHub Actions 결과다. 시험 원문·실제 메일·응시 자료는 테스트에 포함하지 않았다.
+
+| 항목 | 상태 | 검증 범위 |
+|---|---|---|
+| 기존 67개 회귀 테스트 | **PASS** | doctor, inspect, audit, verify, explain, session, 경로·자료 보호 |
+| 추가 20개 자동 테스트 | **PASS** | 업무 질문/답변·반영, 결정, 검증 주장·파일 변경, 로컬 제출 점검, 손상된 기록, 웹 오류 힌트 |
+| Python 3.10 | **87/87 PASS** | GitHub Actions Ubuntu Linux |
+| Python 3.12 | **87/87 PASS** | GitHub Actions Ubuntu Linux |
+| Python 3.13 | **87/87 PASS** | GitHub Actions Ubuntu Linux |
+| 파일 작업 후 증거 무효화 | **PASS** | SHA-256 비교, 오래된 결과 표시 |
+| 자동 명령·제출 실행 부재 | **PASS (테스트 범위)** | 명령 문자열은 기록만 하며 실행하지 않음 |
+| Cofa 웹 IDE 실제 사용·제출 | **NOT RUN** | 접근 권한이 필요한 실사용 검증 |
+| 실제 Codex의 과제 해결 능력 향상 | **NOT RUN** | 모델 A/B 실험 필요 |
+| Windows/macOS 네이티브 실행 | **NOT RUN** | GitHub Actions는 Linux에서만 실행 |
+
+**CI 증거:** [Python unit tests run #1 이후의 최종 성공 실행](https://github.com/sebia1993/ai-task-kit/actions/runs/40717820549), 커밋 f470268567362a12597b2c26fb8119625c46f0fd, 모든 Python 버전 작업 성공.
+
+검증 명령: `python -S -m unittest discover -s tests -v`. 기능은 원본 과제 파일을 자동으로 변경하지 않고, 작업 기록은 `.ai-task-kit/worklog.json`에 선택적으로 저장한다. `PASS_RECORDED_ONLY`는 사용자가 입력한 실행 결과의 상태일 뿐 독립적으로 검증한 성공 판정이 아니다. `preflight`는 제출 파일의 형식과 기록을 보조 점검하지만 에디터의 저장 완료·플랫폼의 제출 완료를 알 수 없다. 실제 서비스 화면 확인은 사람이 수행한다.
+
+본 검증은 작성자와 자동 테스트에 의한 확인이다. 독립 코드 리뷰, Cofa 플랫폼 호환성, 시험 점수 향상을 입증하지 않는다.

@@ -19,7 +19,7 @@
 
 ## Task 1: 검사 CLI
 **Files:** `kit.py`, `.agents/skills/ai-task-kit/scripts/taskkit.py`, `tests/test_kit.py`
-**Interface:** `python3 kit.py <doctor|inspect|audit|verify|explain|session> ... [--json]`; 결과 status/scope/summary/details, 종료 코드 0/1/2.
+**Interface:** `python3 kit.py <doctor|inspect|audit|verify|explain|session|worklog|preflight> ... [--json]`; 결과 status/scope/summary/details, 종료 코드 0/1/2.
 - [ ] 경로/입력/상태 구분 회귀 테스트를 먼저 작성하고 실패 확인.
 - [ ] 읽기 전용 검사, 수치 검산, 안전한 세션 상태 저장 구현.
 - [ ] 전체 unittest 및 CLI 스모크 테스트 통과 확인.
@@ -37,6 +37,16 @@
 - [ ] 작성자 자가 리뷰, 중요 결함 회귀 테스트 추가.
 - [ ] ZIP 및 SHA256 manifest 생성, 압축 해제 복사본 전체 테스트.
 - [ ] 비어 있는 사용자 저장소에 초기 구현 반영 후 파일 해시 재확인.
+
+## Task 4: 공식 매뉴얼 기반 보강 (2026-10-29)
+
+**범위:** 요구사항·업무 질문·답변 반영 상태, 판단·검증 기록, 로컬 제출 점검, Cofa 웹 실행 안내.
+- [x] 기존 검사 기능을 활용한 선택형 로컬 기록·해시 비교.
+- [x] 요구사항·질문·답변·결정·검증 기록 및 상태 출력.
+- [x] 필수 제출 파일과 도구 파일·임시 파일 검토 후보 확인.
+- [x] Cofa Browser 실행/오류 대응 참고 문서 및 한국어 오류 힌트.
+- [x] 합성 데이터 기반 자동 테스트·CI 구성.
+- [ ] 실제 Cofa 접속 및 AI 모델 과제 성능 확인 (별도 환경 필요).
 
 ## 승인과 한계
 사용자의 최신 요청은 이 설계의 구현 승인이다. 별도 PR/릴리스나 제3자 저장소 변경은 하지 않는다. 신규 빈 저장소 초기 버전만 반영한다. 실제 Cofa 접근과 모델 A/B 평가는 제공되지 않아 완료를 주장하지 않는다.
