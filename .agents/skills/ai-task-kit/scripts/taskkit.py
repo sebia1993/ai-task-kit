@@ -697,7 +697,7 @@ def worklog(args):
             'requirement': args.requirement, 'file': args.file,
             'sha256': digest, 'command': record_text(args.recorded_command, '실제로 실행한 검사 명령'),
             'outcome': args.outcome, 'note': record_text(args.note, '실제 관측 결과'),
-            'recorded_at': time.time(), 'self_reported': True}
+            'recorded_at': int(time.time()), 'self_reported': True}
     else:
         raise KitError('지원하지 않는 기록 작업입니다.')
     save_worklog(path, state)
