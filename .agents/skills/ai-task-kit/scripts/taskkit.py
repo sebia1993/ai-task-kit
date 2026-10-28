@@ -20,7 +20,7 @@ import sys
 import tempfile
 import time
 
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 MAX_BYTES = 8 * 1024 * 1024
 MAX_ROWS = 100_000
 MAX_COLUMNS = 1_024
@@ -495,6 +495,244 @@ def session(args):
                   official_timer=False)
 
 
+
+# A local, user-entered work record. No process execution, network requests or auto submission.
+WORKLOG_BYTES = 128 * 1024
+WORKLOG_LIMITS = {'requirements': 64, 'questions': 128, 'decisions': 128, 'evidence': 256}
+
+
+def worklog_path(root: Path) -> Path:
+    return safe_path(root, '.ai-task-kit/worklog.json')
+
+
+def new_worklog(root: Path) -> dict:
+    return {'schema_version': 1, 'root': str(root), 'requirements': {},
+            'questions': {}, 'decisions': {}, 'evidence': {}}
+
+
+def load_worklog(root: Path) -> tuple[Path, dict, bool]:
+    path = worklog_path(root)
+    if not path.exists() and not path.is_symlink():
+        return path, new_worklog(root), False
+    state = strict_json(decoded(read_bytes(path, WORKLOG_BYTES)))
+    if (not isinstance(state, dict) or set(state) != set(new_worklog(root))
+            or state.get('schema_version') != 1 or state.get('root') != str(root)):
+        raise KitError('작업 기록의 형식 또는 과제 폴더가 다릅니다. 자동 덮어쓰지 않습니다.')
+    for field, maximum in WORKLOG_LIMITS.items():
+        entries = state[field]
+        if (not isinstance(entries, dict) or len(entries) > maximum
+                or any(not isinstance(key, str) or not ISSUE.fullmatch(key)
+                       or not isinstance(value, dict) for key, value in entries.items())):
+            raise KitError('작업 기록 항목의 형식 또는 개수가 유효하지 않습니다.')
+    return path, state, True
+
+
+def save_worklog(path: Path, state: dict):
+    """An atomic local write; one writer only. Not a hostile-filesystem sandbox."""
+    if path.is_symlink() or path.parent.is_symlink():
+        raise KitError('기록 폴더 또는 파일이 심볼릭 링크입니다. 쓰지 않았습니다.')
+    if path.exists() and not path.is_file():
+        raise KitError('기록 파일 경로가 일반 파일이 아닙니다.')
+    payload = (json.dumps(state, ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode('utf-8')
+    if len(payload) > WORKLOG_BYTES:
+        raise KitError('작업 기록이 128 KiB 한도를 넘었습니다. 기록하지 않았습니다.')
+    path.parent.mkdir(exist_ok=True)
+    temp_name = None
+    try:
+        with tempfile.NamedTemporaryFile(mode='wb', dir=path.parent, prefix='.worklog-',
+                                         suffix='.tmp', delete=False) as stream:
+            temp_name = stream.name
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if path.is_symlink():
+            raise KitError('기록 파일 경로가 변경되었습니다. 쓰지 않았습니다.')
+        os.replace(temp_name, path)
+    finally:
+        if temp_name and os.path.exists(temp_name):
+            os.unlink(temp_name)
+
+
+def record_text(value: str, label: str, max_length: int = 1200) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > max_length:
+        raise KitError(f'{label}은(는) 빈 값 없이 {max_length}자 이내로 입력하세요.')
+    return value.strip()
+
+
+def record_id(value: str) -> str:
+    if not value or not ISSUE.fullmatch(value):
+        raise KitError('기록 ID는 영문·숫자로 시작하며 하이픈·밑줄 포함 64자 이내여야 합니다.')
+    return value
+
+
+def artifact_path(root: Path, value: str) -> Path:
+    path = safe_path(root, value)
+    if Path(value).parts[0] == '.ai-task-kit':
+        raise KitError('도구 내부 기록을 과제 산출물이나 검증 파일로 등록하지 않습니다.')
+    return path
+
+
+def artifact_digest(root: Path, relative: str) -> str | None:
+    try:
+        return hashlib.sha256(read_bytes(artifact_path(root, relative))).hexdigest()
+    except (KitError, OSError, ValueError):
+        return None
+
+
+def worklog_overview(root: Path, state: dict) -> dict:
+    questions = []
+    for qid, question in state['questions'].items():
+        if not question.get('answer'):
+            qstate = 'UNANSWERED'
+        elif not question.get('applied'):
+            qstate = 'ANSWERED_NOT_APPLIED'
+        elif any(artifact_digest(root, p['file']) != p['sha256']
+                 for p in question['applied']):
+            qstate = 'APPLIED_FILE_CHANGED'
+        else:
+            qstate = 'APPLICATION_RECORDED'
+        questions.append({'id': qid, 'requirement': question.get('requirement'),
+                          'state': qstate, 'question': question.get('text')})
+    requirements = []
+    for rid, item in state['requirements'].items():
+        related = [q for q in questions if q['requirement'] == rid]
+        file_results = []
+        for file in item.get('files', []):
+            matching = [e for e in state['evidence'].values()
+                        if e.get('requirement') == rid and e.get('file') == file]
+            recent = matching[-1] if matching else None
+            latest = 'NO_EVIDENCE'
+            if recent:
+                if artifact_digest(root, file) != recent['sha256']:
+                    latest = 'FILE_CHANGED_OR_UNREADABLE'
+                else:
+                    latest = 'RECORDED_' + recent['outcome']
+            file_results.append({'file': file, 'state': latest})
+        if any(q['state'] == 'UNANSWERED' for q in related):
+            level = 'QUESTION_PENDING'
+        elif any(q['state'] == 'ANSWERED_NOT_APPLIED' for q in related):
+            level = 'ANSWER_NOT_APPLIED'
+        elif any(q['state'] == 'APPLIED_FILE_CHANGED' for q in related):
+            level = 'APPLIED_FILE_CHANGED'
+        elif not file_results:
+            level = 'OUTPUT_FILES_NOT_DECLARED'
+        elif any(f['state'] == 'FILE_CHANGED_OR_UNREADABLE' for f in file_results):
+            level = 'EVIDENCE_STALE'
+        elif any(f['state'] == 'RECORDED_FAIL' for f in file_results):
+            level = 'FAIL_RECORDED'
+        elif any(f['state'] != 'RECORDED_PASS' for f in file_results):
+            level = 'EVIDENCE_MISSING'
+        else:
+            level = 'PASS_RECORDED_ONLY'
+        requirements.append({'id': rid, 'text': item['text'], 'state': level,
+                             'files': file_results})
+    return {'requirements': requirements, 'questions': questions,
+            'decision_count': len(state['decisions']),
+            'evidence_count': len(state['evidence']),
+            'declarations_are_not_independent_tests': True}
+
+
+def worklog(args):
+    root = task_root(args.root)
+    path, state, exists = load_worklog(root)
+    if args.action == 'status':
+        return result('worklog', 'UNVERIFIED', 'user_entered_local_records',
+                      '기록된 주장과 현재 파일을 대조했습니다. 실제 명령 실행이나 정답 판정은 하지 않았습니다.',
+                      exists=exists, **worklog_overview(root, state))
+    category = {'requirement': 'requirements', 'ask': 'questions',
+                'decision': 'decisions', 'evidence': 'evidence'}.get(args.action)
+    key = record_id(args.id)
+    if category and key in state[category]:
+        raise KitError('같은 ID의 기록이 이미 있습니다. 기존 기록을 조용히 덮어쓰지 않습니다.')
+    if category and len(state[category]) >= WORKLOG_LIMITS[category]:
+        raise KitError('작업 기록 항목 한도에 도달했습니다.')
+    if args.action == 'requirement':
+        filenames = list(dict.fromkeys(args.file or []))
+        for name in filenames:
+            artifact_path(root, name)
+        state['requirements'][key] = {'text': record_text(args.text, '요구사항'),
+                                      'files': filenames}
+    elif args.action == 'ask':
+        if args.requirement not in state['requirements']:
+            raise KitError('연결할 요구사항 ID가 없습니다. requirement부터 기록하세요.')
+        state['questions'][key] = {'requirement': args.requirement,
+                                   'text': record_text(args.text, '질문'),
+                                   'answer': None, 'source': None, 'applied': []}
+    elif args.action == 'answer':
+        question = state['questions'].get(key)
+        if question is None:
+            raise KitError('해당 질문 ID가 없습니다.')
+        if question['answer']:
+            raise KitError('이미 답변이 기록됐습니다. 동일 ID의 답변을 덮어쓰지 않습니다.')
+        question['answer'] = record_text(args.text, '담당자 답변')
+        question['source'] = record_text(args.source, '답변 출처', 200)
+    elif args.action == 'apply':
+        question = state['questions'].get(key)
+        if question is None or not question.get('answer'):
+            raise KitError('답변이 기록된 질문 ID만 반영 대상으로 지정할 수 있습니다.')
+        applied = []
+        for name in dict.fromkeys(args.file):
+            digest = artifact_digest(root, name)
+            if digest is None:
+                raise KitError('답변 반영 파일을 읽지 못했습니다. 파일을 확인한 뒤 기록하세요.')
+            applied.append({'file': name, 'sha256': digest})
+        question['applied'] = applied
+    elif args.action == 'decision':
+        if args.requirement not in state['requirements']:
+            raise KitError('연결할 요구사항 ID가 없습니다.')
+        state['decisions'][key] = {
+            'requirement': args.requirement, 'text': record_text(args.text, '결정'),
+            'reason': record_text(args.reason, '판단 근거'),
+            'source': record_text(args.source, '판단 출처', 200)}
+    elif args.action == 'evidence':
+        if args.requirement not in state['requirements']:
+            raise KitError('연결할 요구사항 ID가 없습니다.')
+        recorded_files = state['requirements'][args.requirement]['files']
+        if args.file not in recorded_files:
+            raise KitError('해당 파일이 요구사항에 등록되지 않았습니다. 먼저 requirement에 --file을 지정하세요.')
+        digest = artifact_digest(root, args.file)
+        if digest is None:
+            raise KitError('검증 대상 파일을 읽지 못했습니다. 실제 파일을 확인하세요.')
+        state['evidence'][key] = {
+            'requirement': args.requirement, 'file': args.file,
+            'sha256': digest, 'command': record_text(args.command, '실제로 실행한 검사 명령'),
+            'outcome': args.outcome, 'note': record_text(args.note, '실제 관측 결과'),
+            'recorded_at': time.time(), 'self_reported': True}
+    else:
+        raise KitError('지원하지 않는 기록 작업입니다.')
+    save_worklog(path, state)
+    return result('worklog', 'PASS', 'local_record_write_only',
+                  '로컬 기록에 저장했습니다. 답변 반영·테스트 실행·제출 완료를 자동으로 검증한 것은 아닙니다.',
+                  action=args.action, id=key, output=str(path), executed_commands=False,
+                  externally_verified=False)
+
+
+def preflight(args):
+    root = task_root(args.root)
+    inspected = inspect_project(args)
+    checked = verify(args)
+    _path, state, exists = load_worklog(root)
+    overview = worklog_overview(root, state)
+    required = list(dict.fromkeys(args.require or []))
+    files = inspected['details']['files']
+    candidates = [name for name in files if Path(name).suffix.lower()
+                  in {'.tmp', '.bak', '.old', '.pyc', '.swp'} or name.endswith('~')]
+    tool_inside = (root / 'ai-task-kit' / 'BOOTSTRAP.md').is_file()
+    status = 'FAIL' if checked['status'] == 'FAIL' else 'UNVERIFIED'
+    return result('preflight', status, 'local_files_and_self_reported_evidence_only',
+                  '필수 파일·기록·검토 후보를 확인했습니다. 에디터 저장과 실제 제출은 직접 확인해야 합니다.',
+                  required_checks=checked['details']['checks'],
+                  requirements_supplied=bool(required), inventory_truncated=inspected['details']['truncated'],
+                  inventory_limitations=inspected['details']['limitations'],
+                  other_files_count=len(set(files) - set(required)),
+                  review_candidates=candidates[:30], review_candidates_truncated=len(candidates) > 30,
+                  nested_toolkit_candidate=tool_inside,
+                  worklog_exists=exists, worklog=overview,
+                  editor_save_confirmed=False, functional_tests_executed_by_tool=False,
+                  submission_confirmed=False, auto_submitted=False)
+
+
+
 class Parser(argparse.ArgumentParser):
     def error(self, message):
         raise KitError('명령 사용법을 확인하세요: ' + message)
@@ -535,6 +773,33 @@ def parser():
             child.add_argument('--reserve', type=int, default=15, help='검증·제출 확보 시간 (프로젝트 권장값)')
         if action == 'attempt':
             child.add_argument('--issue', required=True)
+    w = sub.add_parser('worklog', help='요구사항·업무 질문·판단·실제 관측 기록')
+    acts = w.add_subparsers(dest='action', required=True)
+    for action in ('requirement', 'ask', 'answer', 'apply', 'decision', 'evidence', 'status'):
+        child = acts.add_parser(action)
+        child.add_argument('--root', required=True)
+        child.add_argument('--json', action='store_true')
+        if action != 'status':
+            child.add_argument('--id', required=True)
+        if action in {'requirement', 'ask', 'answer', 'decision'}:
+            child.add_argument('--text', required=True)
+        if action in {'ask', 'decision', 'evidence'}:
+            child.add_argument('--requirement', required=True)
+        if action in {'requirement', 'apply'}:
+            child.add_argument('--file', action='append', required=action == 'apply')
+        if action == 'evidence':
+            child.add_argument('--file', required=True)
+            child.add_argument('--command', required=True)
+            child.add_argument('--outcome', choices=('PASS', 'FAIL'), required=True)
+            child.add_argument('--note', required=True)
+        if action in {'answer', 'decision'}:
+            child.add_argument('--source', required=True)
+        if action == 'decision':
+            child.add_argument('--reason', required=True)
+    pre = sub.add_parser('preflight', help='로컬 제출 전 점검 (실제 제출·저장 판정 아님)')
+    pre.add_argument('--root', required=True)
+    pre.add_argument('--require', action='append', help='실제 요구한 산출물마다 반복')
+    pre.add_argument('--json', action='store_true')
     return p
 
 
@@ -559,7 +824,8 @@ def main(argv=None) -> int:
     try:
         args = parser().parse_args(raw)
         functions = {'doctor': doctor, 'inspect': inspect_project, 'audit': audit,
-                     'verify': verify, 'explain': explain, 'session': session}
+                     'verify': verify, 'explain': explain, 'session': session,
+                     'worklog': worklog, 'preflight': preflight}
         report = functions[args.command](args)
     except KitError as exc:
         report = result('error', exc.status, 'requested_operation', str(exc))
