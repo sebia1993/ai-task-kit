@@ -10,14 +10,13 @@ python3 "<SCRIPT>" audit --root "<TASK>" --file data/orders.csv --column amount 
 python3 "<SCRIPT>" audit --root "<TASK>" --file data/orders.csv --require-column date --date-column date
 python3 "<SCRIPT>" verify --root "<TASK>" --require main.py --require report.md
 python3 "<SCRIPT>" explain --root "<TASK>" --file local-error.log
-python3 "<SCRIPT>" session start --root "<TASK>" --minutes 180 --reserve 15
-python3 "<SCRIPT>" session status --root "<TASK>"
-python3 "<SCRIPT>" session attempt --root "<TASK>" --issue input-schema
+python3 "<SCRIPT>" retry attempt --root "<TASK>" --issue input-schema
+python3 "<SCRIPT>" retry status --root "<TASK>"
 python3 "<SCRIPT>" worklog status --root "<TASK>"
 python3 "<SCRIPT>" preflight --root "<TASK>" --require main.py --require report.md
 ```
 
-각 명령 끝에 `--json`을 붙이면 구조화된 결과가 나온다. 예시 파일명과 합계는 예시일 뿐이다. 실제 과제 지침에서 경로·기대값을 가져와야 한다. `--minutes`는 도구 시작 시점의 공식 남은 분으로 지정하며 180분을 무조건 복사하지 않는다.
+각 명령 끝에 `--json`을 붙이면 구조화된 결과가 나온다. 예시 파일명과 합계는 예시일 뿐이다. 실제 과제 지침에서 경로·기대값을 가져와야 한다. 남은 시간은 Cofa 공식 시험 타이머에서 직접 확인하며 이 도구는 시간을 추정하지 않는다.
 
 | 명령 | 의미 | 하지 않는 일 |
 |---|---|---|
@@ -26,9 +25,12 @@ python3 "<SCRIPT>" preflight --root "<TASK>" --require main.py --require report.
 | audit | CSV/JSON 구조·결측·중복·명시한 조건 | 자동 결측 제거, 0 채움, 인코딩 추측, DB 접속 |
 | verify | 존재·내용·Python 문법·JSON/CSV 구조 | 앱 실행, 테스트 실행, 정답/점수 판정, 자동 제출 |
 | explain | 오류 유형별 한국어 조사 힌트 | 원인 확정, 로그 원문 재출력, 자동 패키지 설치 |
-| session | 로컬 시간 추정·같은 오류 재시도 횟수 | 공식 타이머 읽기, 백그라운드 알림, 실행 강제 중단 |
+| retry | 같은 오류의 수동 실패 기록·반복 오류 대응 권고 | 공식 시간 계산, 자동 오류 감지, 재시도 명령 실행 |
 | worklog | 요구사항·업무 질문·답변·판단·검증 주장 기록 | 담당자 메시지 자동 전송, 검증 명령 실행 |
 | preflight | 필수 파일·검토 후보·작업 기록 종합 점검 | 에디터 저장 상태 판정, 자동 제출 |
+
+## 오류 재시도 기록
+`retry attempt --root <TASK> --issue <오류ID>`는 사용자가 관찰한 동일 오류의 실패 횟수를 1씩 늘린다. 1회면 원인 조사, 2회 이상이면 원인·대안 재검토를 권고한다. `retry status`는 기록만 조회하며 기록이 없으면 `UNVERIFIED`이고 파일을 생성하지 않는다. **타이머 시작, 남은 시간 입력, 자동 알림, 자동 실행 기능은 없다.**
 
 ## 결과를 정확하게 해석하기
 - `PASS`(종료 0): **scope에 표시된 검사만** 통과했다.
@@ -49,4 +51,4 @@ python3 "<SCRIPT>" preflight --root "<TASK>" --require main.py --require report.
 파일 8 MiB, 표 100,000행·1,024열·행×열 2,000,000, 파일 목록 500개/탐색 항목 2,000개/깊이 12 제한이 있다. 한도를 넘으면 전체 검사가 완료됐다고 하지 않는다. 대규모 자료는 Codex가 별도 스트리밍 구현을 만들되 샘플 결과를 전체 결과로 포장하지 않는다.
 
 ## 안전 범위
-읽기 명령은 입력 파일을 수정하지 않는다. `session start/attempt`는 `.ai-task-kit/session.json`, 명시적인 `worklog` 기록 명령만 `.ai-task-kit/worklog.json`을 저장한다. `preflight`와 `worklog status`는 파일을 수정하지 않는다. 동시 다중 기록은 지원하지 않으며 한 에이전트가 사용한다. 원본과 다른 프로세스가 동시에 경로를 바꾸는 적대적 상황을 막는 OS 샌드박스가 아니다. 도구 자체에 네트워크·프로세스 실행 코드는 없지만 Codex와 다른 도구의 통신까지 차단하지는 않는다.
+읽기 명령은 입력 파일을 수정하지 않는다. `retry attempt`는 `.ai-task-kit/retries.json`, 명시적인 `worklog` 기록 명령은 `.ai-task-kit/worklog.json`을 저장한다. `retry status`는 파일을 변경하지 않는다. 기존 `.ai-task-kit/session.json`은 읽거나 수정하거나 자동 이관하지 않는다. `preflight`와 `worklog status`는 파일을 수정하지 않는다. 동시 다중 기록은 지원하지 않으며 한 에이전트가 사용한다. 원본과 다른 프로세스가 동시에 경로를 바꾸는 적대적 상황을 막는 OS 샌드박스가 아니다. 도구 자체에 네트워크·프로세스 실행 코드는 없지만 Codex와 다른 도구의 통신까지 차단하지는 않는다.
