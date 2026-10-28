@@ -182,6 +182,15 @@ class WorkflowTests(unittest.TestCase):
                      '--note', '주장만 기록', status='PASS')
         self.assertFalse((self.root / 'should_not_exist').exists())
 
+
+    def test_web_error_hints(self):
+        self.put('error.log', 'Error: listen EADDRINUSE: address already in use')
+        r = self.run_kit('explain', '--root', str(self.root), '--file', 'error.log', status='UNVERIFIED')
+        self.assertEqual(r['details']['category'], 'EADDRINUSE')
+        self.put('error.log', 'ECONNREFUSED while loading local server')
+        r = self.run_kit('explain', '--root', str(self.root), '--file', 'error.log', status='UNVERIFIED')
+        self.assertEqual(r['details']['category'], 'ECONNREFUSED')
+
     def test_standalone_skill_entrypoint(self):
         self.put('main.py', 'print(1)')
         self.run_kit('preflight', '--root', str(self.root),
