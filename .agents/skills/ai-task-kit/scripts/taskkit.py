@@ -695,7 +695,7 @@ def worklog(args):
             raise KitError('검증 대상 파일을 읽지 못했습니다. 실제 파일을 확인하세요.')
         state['evidence'][key] = {
             'requirement': args.requirement, 'file': args.file,
-            'sha256': digest, 'command': record_text(args.command, '실제로 실행한 검사 명령'),
+            'sha256': digest, 'command': record_text(args.recorded_command, '실제로 실행한 검사 명령'),
             'outcome': args.outcome, 'note': record_text(args.note, '실제 관측 결과'),
             'recorded_at': time.time(), 'self_reported': True}
     else:
@@ -789,7 +789,7 @@ def parser():
             child.add_argument('--file', action='append', required=action == 'apply')
         if action == 'evidence':
             child.add_argument('--file', required=True)
-            child.add_argument('--command', required=True)
+            child.add_argument('--command', dest='recorded_command', required=True)
             child.add_argument('--outcome', choices=('PASS', 'FAIL'), required=True)
             child.add_argument('--note', required=True)
         if action in {'answer', 'decision'}:
