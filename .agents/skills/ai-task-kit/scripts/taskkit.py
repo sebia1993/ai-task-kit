@@ -529,6 +529,39 @@ def load_worklog(root: Path) -> tuple[Path, dict, bool]:
                 or any(not isinstance(key, str) or not ISSUE.fullmatch(key)
                        or not isinstance(value, dict) for key, value in entries.items())):
             raise KitError('작업 기록 항목의 형식 또는 개수가 유효하지 않습니다.')
+    # All subsequent readers should be safe even if a record file was manually corrupted.
+    for item in state['requirements'].values():
+        if (not isinstance(item.get('text'), str) or not isinstance(item.get('files'), list)
+                or not all(isinstance(name, str) and name for name in item['files'])):
+            raise KitError('요구사항 기록의 세부 형식이 잘못됐습니다.')
+    for item in state['questions'].values():
+        if (item.get('requirement') not in state['requirements']
+                or not isinstance(item.get('text'), str)
+                or item.get('answer') is not None and not isinstance(item.get('answer'), str)
+                or item.get('source') is not None and not isinstance(item.get('source'), str)
+                or not isinstance(item.get('applied'), list)):
+            raise KitError('질문·답변 기록의 세부 형식이 잘못됐습니다.')
+        for link in item['applied']:
+            if (not isinstance(link, dict) or not isinstance(link.get('file'), str)
+                    or not isinstance(link.get('sha256'), str)
+                    or not re.fullmatch(r'[0-9a-f]{64}', link['sha256'])):
+                raise KitError('질문 반영 파일 기록이 손상됐습니다.')
+    for item in state['decisions'].values():
+        if (item.get('requirement') not in state['requirements']
+                or not all(isinstance(item.get(field), str)
+                           for field in ('text', 'reason', 'source'))):
+            raise KitError('판단 기록의 세부 형식이 잘못됐습니다.')
+    for item in state['evidence'].values():
+        if (item.get('requirement') not in state['requirements']
+                or not isinstance(item.get('file'), str)
+                or not isinstance(item.get('sha256'), str)
+                or not re.fullmatch(r'[0-9a-f]{64}', item['sha256'])
+                or item.get('outcome') not in ('PASS', 'FAIL')
+                or not all(isinstance(item.get(field), str)
+                           for field in ('command', 'note'))
+                or item.get('self_reported') is not True
+                or type(item.get('recorded_at')) is not int):
+            raise KitError('검증 기록의 세부 형식이 잘못됐습니다.')
     return path, state, True
 
 
@@ -732,6 +765,7 @@ def preflight(args):
                   other_files_count=len(set(files) - set(required)),
                   review_candidates=candidates[:30], review_candidates_truncated=len(candidates) > 30,
                   nested_toolkit_candidate=tool_inside,
+                  internal_tool_state_dir_present=(root / '.ai-task-kit').is_dir(),
                   worklog_exists=exists, worklog=overview,
                   editor_save_confirmed=False, functional_tests_executed_by_tool=False,
                   submission_confirmed=False, auto_submitted=False)
