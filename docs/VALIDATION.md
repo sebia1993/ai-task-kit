@@ -59,17 +59,17 @@ python3 -S -m unittest discover -s tests -v
 | 항목 | 상태 | 검증 범위 |
 |---|---|---|
 | 기존 67개 회귀 테스트 | **PASS** | doctor, inspect, audit, verify, explain, session, 경로·자료 보호 |
-| 추가 18개 자동 테스트 | **PASS** | 업무 질문/답변·반영, 결정, 검증 주장·파일 변경, 로컬 제출 점검, 손상된 기록, 웹 오류 힌트 |
-| Python 3.10 | **85/85 PASS** | GitHub Actions Ubuntu Linux |
-| Python 3.12 | **85/85 PASS** | GitHub Actions Ubuntu Linux |
-| Python 3.13 | **85/85 PASS** | GitHub Actions Ubuntu Linux |
+| 추가 20개 자동 테스트 | **PASS** | 업무 질문/답변·반영, 결정, 검증 주장·파일 변경, 로컬 제출 점검, 손상된 기록, 웹 오류 힌트 |
+| Python 3.10 | **87/87 PASS** | GitHub Actions Ubuntu Linux |
+| Python 3.12 | **87/87 PASS** | GitHub Actions Ubuntu Linux |
+| Python 3.13 | **87/87 PASS** | GitHub Actions Ubuntu Linux |
 | 파일 작업 후 증거 무효화 | **PASS** | SHA-256 비교, 오래된 결과 표시 |
 | 자동 명령·제출 실행 부재 | **PASS (테스트 범위)** | 명령 문자열은 기록만 하며 실행하지 않음 |
 | Cofa 웹 IDE 실제 사용·제출 | **NOT RUN** | 접근 권한이 필요한 실사용 검증 |
 | 실제 Codex의 과제 해결 능력 향상 | **NOT RUN** | 모델 A/B 실험 필요 |
 | Windows/macOS 네이티브 실행 | **NOT RUN** | GitHub Actions는 Linux에서만 실행 |
 
-**CI 증거:** [Python unit tests run #1 이후의 최종 성공 실행](https://github.com/sebia1993/ai-task-kit/actions/runs/40716958551), 커밋 00d22327027b861cd9f39770ab8c115f6806857c, 모든 Python 버전 작업 성공.
+**CI 증거:** [Python unit tests run #1 이후의 최종 성공 실행](https://github.com/sebia1993/ai-task-kit/actions/runs/40717820549), 커밋 f470268567362a12597b2c26fb8119625c46f0fd, 모든 Python 버전 작업 성공.
 
 검증 명령: `python -S -m unittest discover -s tests -v`. 기능은 원본 과제 파일을 자동으로 변경하지 않고, 작업 기록은 `.ai-task-kit/worklog.json`에 선택적으로 저장한다. `PASS_RECORDED_ONLY`는 사용자가 입력한 실행 결과의 상태일 뿐 독립적으로 검증한 성공 판정이 아니다. `preflight`는 제출 파일의 형식과 기록을 보조 점검하지만 에디터의 저장 완료·플랫폼의 제출 완료를 알 수 없다. 실제 서비스 화면 확인은 사람이 수행한다.
 
