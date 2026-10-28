@@ -234,55 +234,94 @@ class KitTests(unittest.TestCase):
         self.assertEqual(r['details']['category'], 'KeyError')
         self.assertNotIn('not-for-output', json.dumps(r))
 
-    def test_session_no_state(self):
-        self.call('session', 'status', '--root', self.root, status='UNVERIFIED')
+    def test_retry_status_without_record_is_read_only(self):
+        r = self.call('retry', 'status', '--root', self.root, status='UNVERIFIED')
+        self.assertEqual(r['details']['counts'], {})
+        self.assertFalse((self.root / '.ai-task-kit').exists())
 
-    def test_session_start_and_resume(self):
-        self.call('session', 'start', '--root', self.root, '--minutes', '180', status='PASS')
-        p = self.root / '.ai-task-kit/session.json'
-        old = p.read_bytes()
-        self.call('session', 'start', '--root', self.root, status='FAIL')
-        self.assertEqual(old, p.read_bytes())
-        r = self.call('session', 'status', '--root', self.root, status='PASS')
-        self.assertLessEqual(r['details']['remaining_minutes'], 180)
-        self.assertEqual(r['details']['mode'], 'IMPLEMENT')
+    def test_retry_first_and_second_attempt_without_timer(self):
+        first = self.call('retry', 'attempt', '--root', self.root, '--issue', 'csv-error', status='PASS')
+        self.assertEqual(first['details']['attempts'], 1)
+        self.assertEqual(first['details']['action'], 'INVESTIGATE')
+        saved = json.loads((self.root / '.ai-task-kit/retries.json').read_text())
+        self.assertEqual(set(saved), {'schema_version', 'root', 'attempts'})
+        self.assertEqual(saved['attempts'], {'csv-error': 1})
+        second = self.call('retry', 'attempt', '--root', self.root, '--issue', 'csv-error',
+                           status='UNVERIFIED')
+        self.assertEqual(second['details']['attempts'], 2)
+        self.assertEqual(second['details']['action'], 'CHANGE_STRATEGY')
+        status = self.call('retry', 'status', '--root', self.root, status='PASS')
+        self.assertEqual(status['details']['counts'], {'csv-error': 2})
+        self.assertEqual(status['details']['change_strategy_issues'], ['csv-error'])
 
-    def test_session_attempt_limit(self):
-        self.call('session', 'start', '--root', self.root, '--minutes', '180')
-        self.call('session', 'attempt', '--root', self.root, '--issue', 'csv-error')
-        r = self.call('session', 'attempt', '--root', self.root, '--issue', 'csv-error', status='UNVERIFIED')
-        self.assertEqual(r['details']['attempts'], 2)
-        self.assertEqual(r['details']['action'], 'CHANGE_STRATEGY')
+    def test_retry_records_multiple_independent_issues(self):
+        self.call('retry', 'attempt', '--root', self.root, '--issue', 'csv-error')
+        self.call('retry', 'attempt', '--root', self.root, '--issue', 'api-error')
+        self.call('retry', 'attempt', '--root', self.root, '--issue', 'api-error')
+        r = self.call('retry', 'status', '--root', self.root, status='PASS')
+        self.assertEqual(r['details']['counts'], {'csv-error': 1, 'api-error': 2})
+        self.assertEqual(r['details']['change_strategy_issues'], ['api-error'])
 
-    def test_session_short_remaining(self):
-        self.call('session', 'start', '--root', self.root, '--minutes', '10', '--reserve', '5')
-        p = self.root / '.ai-task-kit/session.json'
-        s = json.loads(p.read_text())
-        s['started_at'] -= 6 * 60
-        p.write_text(json.dumps(s))
-        r = self.call('session', 'status', '--root', self.root)
-        self.assertEqual(r['details']['mode'], 'VERIFY_AND_SUBMIT')
+    def test_retry_invalid_issue_rejected_without_state(self):
+        for issue in ('../outside', 'with spaces', 'abc/123'):
+            self.call('retry', 'attempt', '--root', self.root, '--issue', issue, status='FAIL')
+        self.assertFalse((self.root / '.ai-task-kit').exists())
 
-    def test_session_clock_backward(self):
-        self.call('session', 'start', '--root', self.root, '--minutes', '180')
-        p = self.root / '.ai-task-kit/session.json'
-        s = json.loads(p.read_text())
-        s['started_at'] += 3600
-        p.write_text(json.dumps(s))
-        self.call('session', 'status', '--root', self.root, status='UNVERIFIED')
+    def test_retry_session_and_timer_options_removed(self):
+        self.call('session', 'status', '--root', self.root, status='FAIL')
+        self.call('retry', 'attempt', '--root', self.root, '--issue', 'x',
+                  '--minutes', '180', status='FAIL')
+        self.call('retry', 'status', '--root', self.root, '--reserve', '15', status='FAIL')
+        self.assertFalse((self.root / '.ai-task-kit').exists())
 
-    def test_session_invalid_reserve(self):
-        self.call('session', 'start', '--root', self.root, '--minutes', '5', '--reserve', '15', status='FAIL')
-
-    def test_session_symlink_directory(self):
+    def test_retry_symlink_directory_rejected(self):
         dest = self.root / 'other'
         dest.mkdir()
         try:
             (self.root / '.ai-task-kit').symlink_to(dest, target_is_directory=True)
         except OSError:
             self.skipTest('symlinks unavailable')
-        self.call('session', 'start', '--root', self.root, '--minutes', '180', status='FAIL')
+        self.call('retry', 'attempt', '--root', self.root, '--issue', 'x', status='FAIL')
         self.assertEqual(list(dest.iterdir()), [])
+
+    def test_retry_symlink_record_file_rejected(self):
+        target = self.put('safe.json', '{}')
+        try:
+            folder = self.root / '.ai-task-kit'
+            folder.mkdir()
+            (folder / 'retries.json').symlink_to(target)
+        except OSError:
+            self.skipTest('symlinks unavailable')
+        self.call('retry', 'attempt', '--root', self.root, '--issue', 'x', status='FAIL')
+        self.assertEqual(target.read_text(), '{}')
+
+    def test_retry_legacy_session_is_never_edited_or_resumed(self):
+        old = self.put('.ai-task-kit/session.json',
+                       '{"schema_version":1,"root":"foreign","minutes":180,"attempts":{"old":3}}')
+        original = old.read_bytes()
+        self.call('retry', 'status', '--root', self.root, status='UNVERIFIED')
+        self.call('retry', 'attempt', '--root', self.root, '--issue', 'new', status='PASS')
+        self.assertEqual(old.read_bytes(), original)
+        state = json.loads((self.root / '.ai-task-kit/retries.json').read_text())
+        self.assertEqual(state['attempts'], {'new': 1})
+
+    def test_retry_corrupt_record_refused_without_reset(self):
+        file = self.put('.ai-task-kit/retries.json', '{"foreign":true}')
+        self.call('retry', 'status', '--root', self.root, status='FAIL')
+        self.call('retry', 'attempt', '--root', self.root, '--issue', 'x', status='FAIL')
+        self.assertEqual(file.read_text(), '{"foreign":true}')
+
+    def test_retry_invalid_counts_are_not_silently_accepted(self):
+        file = self.put('.ai-task-kit/retries.json', json.dumps({
+            'schema_version': 1, 'root': str(self.root), 'attempts': {'bad': True}}))
+        self.call('retry', 'status', '--root', self.root, status='FAIL')
+        self.assertIn('"bad": true', file.read_text())
+
+    def test_retry_standalone_skill(self):
+        r = self.call('retry', 'attempt', '--root', self.root, '--issue', 'error',
+                      script=SKILL / 'scripts/taskkit.py', status='PASS')
+        self.assertEqual(r['details']['attempts'], 1)
+
 
     def test_standalone_skill(self):
         self.call('doctor', '--root', self.root, script=SKILL / 'scripts/taskkit.py', status='PASS')
@@ -321,8 +360,6 @@ class KitTests(unittest.TestCase):
         self.put('a.csv', 'id,x\na,\nb,\n')
         self.call('audit', '--root', self.root, '--file', 'a.csv', '--column', 'x', '--allow-missing', status='UNVERIFIED')
 
-    def test_session_requires_official_minutes(self):
-        self.call('session', 'start', '--root', self.root, status='FAIL')
 
     def test_unknown_error_no_source_echo(self):
         self.put('e.txt', 'unexpected private data')
@@ -343,10 +380,6 @@ class KitTests(unittest.TestCase):
         self.call('verify', '--root', self.root, '--require', 'main.py', status='UNVERIFIED')
         self.assertFalse((self.root / 'executed.txt').exists())
 
-    def test_session_corruption_not_reset(self):
-        self.put('.ai-task-kit/session.json', '{"foreign":true}')
-        self.call('session', 'status', '--root', self.root, status='FAIL')
-        self.assertEqual((self.root / '.ai-task-kit/session.json').read_text(), '{"foreign":true}')
 
     def test_normal_output_is_korean_and_no_traceback(self):
         self.put('a.csv', 'x\n1\n')
@@ -365,15 +398,6 @@ class KitTests(unittest.TestCase):
         self.put('a.json', '{"x":1e999}')
         self.call('audit', '--root', self.root, '--file', 'a.json', status='FAIL')
 
-    def test_session_expired(self):
-        self.call('session', 'start', '--root', self.root, '--minutes', '2', '--reserve', '1')
-        p = self.root / '.ai-task-kit/session.json'
-        s = json.loads(p.read_text())
-        s['started_at'] -= 180
-        p.write_text(json.dumps(s))
-        r = self.call('session', 'status', '--root', self.root)
-        self.assertEqual(r['details']['mode'], 'STOP')
-        self.assertEqual(r['details']['remaining_minutes'], 0)
 
     def test_toolkit_root_supports_shallow_standalone(self):
         import runpy
