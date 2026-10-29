@@ -39,7 +39,7 @@ class PromptReportingTests(unittest.TestCase):
         self.assertIn("P01~P12 지침을 스스로 선택", self.readme)
 
     def test_selection_by_real_situation_only(self):
-        self.assertIn("복합 작업에 최대 3개", self.skill)
+        self.assertIn("복합 작업에서 최대 3개", self.skill)
         self.assertIn("상황이 바뀌면", self.playbook)
         self.assertIn("읽기만 해 놓고 수행하지 않은 지침", self.skill)
 
