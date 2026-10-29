@@ -110,6 +110,12 @@ class PromptReportingTests(unittest.TestCase):
         self.assertIn('python3 "<KIT>/kit.py" audit --root "<TASK>"', self.readme)
         self.assertNotIn('python3 kit.py preflight --root /실제/과제/폴더', self.readme)
 
+    def test_official_timer_guides_priority_not_fixed_shutdown(self):
+        self.assertIn("Cofa 공식 타이머의 남은 시간", self.skill)
+        self.assertIn("필수 산출물의 실제 완성·검증 상태", self.skill)
+        self.assertIn("고정된 15분을 자동 종료 기준으로 사용하거나", self.skill)
+        self.assertIn("자체 타이머", self.skill)
+
     def test_initial_provenance_report_is_not_per_response(self):
         self.assertIn("최초 로드에 한 번만 보고", self.playbook)
         self.assertIn("매 응답", self.skill)
