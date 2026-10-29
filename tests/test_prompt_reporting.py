@@ -72,6 +72,64 @@ class PromptReportingTests(unittest.TestCase):
         for word in ("외부 AI", "후속 서술형", "자동 제출", "공식 타이머", "Computer Use"):
             self.assertIn(word, self.skill)
 
+    def test_toolkit_is_separate_from_task_submission(self):
+        self.assertIn("과제 폴더 바깥", self.readme)
+        self.assertIn("과제 폴더 바깥", self.bootstrap)
+        self.assertIn("KIT가 TASK 안에 있으면", self.playbook)
+        self.assertIn("자동 이동·삭제하지 않는다", self.bootstrap)
+        self.assertIn("제출 대상", self.readme)
+        self.assertIn("제출 대상", self.skill)
+
+    def test_bootstrap_is_single_entrypoint(self):
+        self.assertIn("ai-task-kit/BOOTSTRAP.md를 실제로 읽고", self.readme)
+        self.assertNotIn("ai-task-kit/BOOTSTRAP.md와 ai-task-kit/docs/EXAM_PROMPT_PLAYBOOK.md", self.readme)
+        self.assertIn("단일 시작점", self.bootstrap)
+        self.assertIn("단일 시작점", self.skill)
+        self.assertIn("`BOOTSTRAP.md` 하나를 시작점", self.playbook)
+
+    def test_p01_does_not_require_repeated_bootstrap_and_skill(self):
+        p01 = self.playbook.split("### P01.", 1)[1].split("### P02.", 1)[0]
+        self.assertNotIn("ai-task-kit/BOOTSTRAP.md와 Skill을 확인해줘", p01)
+        self.assertIn("이미 읽었다면 다시 읽지 말고", p01)
+        self.assertIn("P01을 선택한 뒤 BOOTSTRAP과 Skill을 반복해서 읽지 않는다", self.bootstrap)
+        self.assertIn("P01을 적용한다는 이유만으로", self.skill)
+
+    def test_provenance_uses_verified_local_git_read_only_commands(self):
+        rev = 'git -C "<KIT>" rev-parse --verify HEAD'
+        status = 'git -C "<KIT>" status --porcelain -- BOOTSTRAP.md .agents/skills/ai-task-kit/SKILL.md docs/EXAM_PROMPT_PLAYBOOK.md'
+        for doc in (self.bootstrap, self.playbook, self.skill):
+            self.assertIn(rev, doc)
+            self.assertIn(status, doc)
+            self.assertIn("미확인", doc)
+        self.assertIn("첫 명령이", self.bootstrap)
+        self.assertIn("지침 파일 변경", self.playbook)
+        self.assertIn("커밋", self.readme)
+
+    def test_cli_examples_use_explicit_tool_path(self):
+        self.assertIn('python3 "<KIT>/kit.py" preflight --root "<TASK>"', self.readme)
+        self.assertIn('python3 "<KIT>/kit.py" audit --root "<TASK>"', self.readme)
+        self.assertNotIn('python3 kit.py preflight --root /실제/과제/폴더', self.readme)
+
+    def test_official_timer_guides_priority_not_fixed_shutdown(self):
+        self.assertIn("Cofa 공식 타이머의 남은 시간", self.skill)
+        self.assertIn("필수 산출물의 실제 완성·검증 상태", self.skill)
+        self.assertIn("고정된 15분을 자동 종료 기준으로 사용하거나", self.skill)
+        self.assertIn("자체 타이머", self.skill)
+
+    def test_initial_provenance_report_is_not_per_response(self):
+        self.assertIn("최초 로드에 한 번만 보고", self.playbook)
+        self.assertIn("매 응답", self.skill)
+        self.assertIn("초기 로드:", self.bootstrap)
+        self.assertIn("수행 근거:", self.skill)
+        self.assertIn("검증:", self.skill)
+
+    def test_provenance_not_an_actual_content_or_test_guarantee(self):
+        self.assertIn("파일 읽기와 Git 버전 확인은 별개", self.bootstrap)
+        self.assertIn("Git HEAD와 다르다면", self.skill)
+        self.assertIn("실제 파일 읽기는 별개", self.playbook)
+        self.assertIn("독립적인", self.readme)
+        self.assertIn("제출 대상", self.readme)
+
     def test_markdown_fences_balanced(self):
         self.assertEqual(self.playbook.count("~~~") % 2, 0)
         self.assertEqual(self.playbook.count("\x60\x60\x60") % 2, 0)

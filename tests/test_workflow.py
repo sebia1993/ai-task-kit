@@ -207,6 +207,15 @@ class WorkflowTests(unittest.TestCase):
         self.assertFalse(d['internal_tool_state_dir_present'])
         self.assertFalse((self.root / 'should not execute').exists())
 
+    def test_preflight_flags_toolkit_inside_task_without_deleting(self):
+        self.put('main.py', 'print("okay")')
+        self.put('ai-task-kit/BOOTSTRAP.md', '# supporting tool')
+        report = self.run_kit('preflight', '--root', str(self.root),
+                              '--require', 'main.py', status='UNVERIFIED')
+        self.assertTrue(report['details']['nested_toolkit_candidate'])
+        self.assertFalse(report['details']['submission_confirmed'])
+        self.assertTrue((self.root / 'ai-task-kit/BOOTSTRAP.md').exists())
+
     def test_preflight_reports_pending_questions(self):
         self.put('main.py', 'print(1)')
         self.run_kit('worklog', 'requirement', '--root', str(self.root),
