@@ -138,3 +138,25 @@ python3 -S -m unittest discover -s tests -v
 **검증 증거:** [GitHub Actions Python 3.10/3.12/3.13 전체 성공](https://github.com/sebia1993/ai-task-kit/actions/runs/40814938070), 실행 명령 `python -S -m unittest discover -s tests -v`. 추가된 검사는 `tests/test_prompt_reporting.py`의 문서 계약과 `tests/test_workflow.py`의 KIT 내부 배치 경고를 확인했다.
 
 **제약:** 이 변경은 가이드와 회귀 테스트 중심이며, Codex의 파일 읽기·Git 커밋 확인·제출 제외를 독립적으로 강제하거나 검증하지 않는다. Git HEAD가 표시돼도 실제 읽은 내용과 같다는 보증이 되지 않으며, 관련 파일의 변경 상태를 함께 보고해야 한다. 실제 제출 대상은 플랫폼 화면에서 직접 확인하고, 이용이 금지된 경로로 clone하거나 제한을 우회하지 않는다.
+
+---
+
+## 2026-10-29 제한시간 180분 대응 Lite Mode·필수 구현 우선 개정
+
+**변경 사항:** 공개 플레이북 12개를 `docs/prompts/P01.md`~`P12.md`의 개별 상세 파일로 분리했다. `docs/EXAM_PROMPT_PLAYBOOK.md`는 짧은 색인으로 교체했다. 최초에는 `BOOTSTRAP.md`, 공통 `SKILL.md`, 색인만 읽고 실제 상황에 필요한 상세 프롬프트만 추가 로드하도록 권고한다.
+
+| 검증 항목 | 결과 | 근거/제약 |
+|---|---|---|
+| 짧은 색인과 P01~P12 개별 파일 | **PASS (정적 계약)** | 파일·상호 링크·번호 순서·본문 존재 확인 |
+| 최초 로딩 문서의 글자 수 | **정적 크기 확인** | 종전 19,230자 → 변경 후 약 12,180자(BOOTSTRAP+Skill+색인; 상세 파일은 필요할 때 추가). **실제 토큰량/지연 시간은 측정 아님** |
+| 필수/업무 기준 미확정/선택 기능 구분 | **PASS (정적 계약)** | P01과 Skill에 지침 마련, 실제 분류 품질은 미검증 |
+| 최초 입력→처리→출력 실행 경로 우선 | **PASS (정적 계약)** | P03/Skill 지침 존재, 실제 실행 완료 시간은 미검증 |
+| 빠른 관련 테스트/최종 전체 검증 분리 | **PASS (정적 계약)** | P07/Skill 지침 및 UNVERIFIED=기능 미검증 구분 |
+| 반복 오류 전환·선택적 작업 기록 | **PASS (정적 계약)** | P06·P08·Skill에서 반복 시도·기록 부담 감소 지침 |
+| 기존 Python CLI 회귀 및 문서 계약 | **Python 3.10·3.12·3.13 각 115/115 PASS** | GitHub Actions Ubuntu Linux |
+| 실제 Codex의 개발 속도·정확도 향상 | **NOT RUN** | 공개 합성 과제의 모델 A/B 비교 및 실제 작업 시간 측정 필요 |
+| Cofa 플랫폼의 설치/읽기/제출 동작 | **NOT RUN** | 사용자 실제 환경 확인 필요 |
+
+**테스트 증거:** [GitHub Actions 115개 성공 실행](https://github.com/sebia1993/ai-task-kit/actions/runs/40819308333), `python -S -m unittest discover -s tests -v`. 새 `tests/test_prompt_reporting.py`는 문서 구조와 지침 보존을 검사하며, 실제 Codex가 필요한 파일만 읽는지 또는 더 빠르게 개발하는지 **증명하지 않는다**. CLI의 코드·기능을 변경하지 않았고, 외부 전송·자동 제출 기능을 추가하지 않았다.
+
+**실전 원칙:** 필수 기능을 임의 생략하지 않으며, 과제의 공식 평가·지시가 우선이다. 검증을 생략하는 것이 아니라 개발 중 관련 기능만 빠르게 확인하고 주요 단계·제출 전에 전체 필수 요구사항을 검사한다. 모든 공식 타이머·AI 금지 단계 제한은 유지한다.
