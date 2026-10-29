@@ -85,7 +85,7 @@ class PromptReportingTests(unittest.TestCase):
         self.assertNotIn("ai-task-kit/BOOTSTRAP.md와 ai-task-kit/docs/EXAM_PROMPT_PLAYBOOK.md", self.readme)
         self.assertIn("단일 시작점", self.bootstrap)
         self.assertIn("단일 시작점", self.skill)
-        self.assertIn("BOOTSTRAP.md 하나를 시작점", self.playbook)
+        self.assertIn("`BOOTSTRAP.md` 하나를 시작점", self.playbook)
 
     def test_p01_does_not_require_repeated_bootstrap_and_skill(self):
         p01 = self.playbook.split("### P01.", 1)[1].split("### P02.", 1)[0]
@@ -104,6 +104,11 @@ class PromptReportingTests(unittest.TestCase):
         self.assertIn("첫 명령이", self.bootstrap)
         self.assertIn("지침 파일 변경", self.playbook)
         self.assertIn("커밋", self.readme)
+
+    def test_cli_examples_use_explicit_tool_path(self):
+        self.assertIn('python3 "<KIT>/kit.py" preflight --root "<TASK>"', self.readme)
+        self.assertIn('python3 "<KIT>/kit.py" audit --root "<TASK>"', self.readme)
+        self.assertNotIn('python3 kit.py preflight --root /실제/과제/폴더', self.readme)
 
     def test_initial_provenance_report_is_not_per_response(self):
         self.assertIn("최초 로드에 한 번만 보고", self.playbook)
