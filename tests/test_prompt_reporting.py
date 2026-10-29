@@ -40,7 +40,7 @@ class LiteModeContractTests(unittest.TestCase):
         self.assertLess(len(self.index), 4000)
         self.assertNotIn("### P01.", self.index)
         self.assertIn("색인", self.index)
-        self.assertIn("상세 지침 전체를 포함하지 않습니다", self.index)
+        self.assertIn("상세 프롬프트 전체를 포함하지 않습니다", self.index)
 
     def test_all_details_are_small_valid_and_self_contained(self):
         for prompt_id, document in self.details.items():
@@ -150,7 +150,7 @@ class LiteModeContractTests(unittest.TestCase):
         p = self.details["P08"]
         self.assertIn("worklog", p)
         self.assertIn("선택 기능", p)
-        self.assertIn("작은 변경마다", p)
+        self.assertIn("작은 수정마다", p)
 
     def test_p09_checks_submission_without_auto_submission(self):
         p = self.details["P09"]
