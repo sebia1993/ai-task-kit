@@ -76,21 +76,22 @@ ai-task-kit/BOOTSTRAP.md를 실제로 읽고 그 지침에 따라 필요한 Skil
 
 도구는 코드를 대신 생성하거나 테스트를 대신 실행하지 않습니다. 생성·실행·수정은 **플랫폼의 Codex**가 담당합니다. 검증 명령의 `PASS`는 해당 검사 범위에 한정됩니다. `verify`는 파일 형식이 모두 맞아도 기능 동작을 증명하지 못하므로 `UNVERIFIED`를 반환합니다. `worklog`의 PASS 역시 실제 명령을 실행해 확인한 결과가 아닌 **사용자가 입력한 검증 기록**입니다. `preflight`가 정상이어도 실제 제출 상태는 `UNVERIFIED`입니다.
 
-## 개발자용 명령
+## 도구 실행 예시 (KIT와 TASK 경로 분리)
 
-`--root`는 실제 과제 폴더이며 검사 파일은 그 안의 상대 경로입니다.
+`<KIT>`는 공개 지원 도구의 **실제 절대 경로**, `<TASK>`는 현재 과제 폴더의 **실제 절대 경로**로 각각 바꿉니다. 아래 예시는 어느 폴더에 있든 도구 파일을 과제 파일과 혼동하지 않도록 **절대 경로로** 실행합니다.
 
-```bash
-python3 kit.py doctor --root /실제/과제/폴더
-python3 kit.py inspect --root /실제/과제/폴더 --json
-python3 kit.py audit --root /실제/과제/폴더 --file data/input.csv
-python3 kit.py verify --root /실제/과제/폴더 --require main.py --require report.md
-python3 kit.py retry attempt --root /실제/과제/폴더 --issue csv-error
-python3 kit.py retry status --root /실제/과제/폴더
-python3 kit.py worklog status --root /실제/과제/폴더 --json
-python3 kit.py preflight --root /실제/과제/폴더 --require main.py --require report.md
-python3 -m unittest discover -s tests -v
-```
+~~~bash
+python3 "<KIT>/kit.py" doctor --root "<TASK>"
+python3 "<KIT>/kit.py" inspect --root "<TASK>" --json
+python3 "<KIT>/kit.py" audit --root "<TASK>" --file data/input.csv
+python3 "<KIT>/kit.py" verify --root "<TASK>" --require main.py --require report.md
+python3 "<KIT>/kit.py" retry attempt --root "<TASK>" --issue csv-error
+python3 "<KIT>/kit.py" retry status --root "<TASK>"
+python3 "<KIT>/kit.py" worklog status --root "<TASK>" --json
+python3 "<KIT>/kit.py" preflight --root "<TASK>" --require main.py --require report.md
+~~~
+
+도구를 개발·관리하는 사람만 GitHub Actions와 같은 `unittest discover -s tests -v`로 KIT 자체의 회귀 테스트를 실행합니다. **시험 과제 기능 검증은 실제 TASK의 README·테스트 명령을 따릅니다.** KIT의 단위 테스트 통과가 TASK의 정답·제출 완료를 뜻하지 않습니다.
 
 정확한 옵션과 검사 한도는 [도구 설명](.agents/skills/ai-task-kit/references/TOOLS.md)을 참고합니다. 코드 실행 실패를 숨기기 위해 입력·공식 테스트를 바꾸지 않습니다. 지원하지 않는 자료를 억지로 읽지 않습니다.
 
