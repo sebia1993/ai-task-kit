@@ -58,7 +58,7 @@ class LiteModeContractTests(unittest.TestCase):
         self.assertIn("docs/EXAM_PROMPT_PLAYBOOK.md", self.bootstrap)
         self.assertIn("상세 P01~P12를 전부 읽지 않습니다", self.bootstrap)
         self.assertIn("해당 파일만 읽습니다", self.bootstrap)
-        self.assertIn("ai-task-kit/BOOTSTRAP.md를 실제로 읽고", self.readme)
+        self.assertIn("<KIT>/BOOTSTRAP.md를 실제로 읽고", self.readme)
 
     def test_skill_selects_only_current_details(self):
         self.assertIn("docs/prompts/PXX.md", self.skill)

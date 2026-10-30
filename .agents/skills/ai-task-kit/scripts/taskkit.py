@@ -353,6 +353,15 @@ def audit(args):
                   **details, findings=findings)
 
 
+def file_check_status(checks: list[dict]) -> str:
+    """Summarize only requested file checks, never functional correctness."""
+    if any(check['status'] == 'FAIL' for check in checks):
+        return 'FAIL'
+    if not checks or any(check['status'] != 'PASS' for check in checks):
+        return 'UNVERIFIED'
+    return 'PASS'
+
+
 def verify(args):
     root = task_root(args.root)
     checks = []
@@ -387,7 +396,8 @@ def verify(args):
     state = 'FAIL' if any(c['status'] == 'FAIL' for c in checks) else 'UNVERIFIED'
     return result('verify', state, 'submission_preflight_only',
                   '제출 전 형식 검사입니다. 실제 기능 검증과 최종 제출 확인은 별도입니다.',
-                  checks=checks, functional_status='UNVERIFIED', submitted=False,
+                  checks=checks, file_check_status=file_check_status(checks),
+                  functional_status='UNVERIFIED', submitted=False,
                   next_action='Codex가 승인된 실행 도구로 요구사항별 테스트를 수행하고 근거를 확인하세요.')
 
 
@@ -747,16 +757,23 @@ def preflight(args):
     files = inspected['details']['files']
     candidates = [name for name in files if Path(name).suffix.lower()
                   in {'.tmp', '.bak', '.old', '.pyc', '.swp'} or name.endswith('~')]
-    tool_inside = (root / 'ai-task-kit' / 'BOOTSTRAP.md').is_file()
+    own_repo = toolkit_root(Path(__file__).resolve())
+    running_inside = own_repo == root or root in own_repo.parents
+    # Preserve the legacy candidate check as well as checking this running copy.
+    tool_inside = running_inside or (root / 'ai-task-kit' / 'BOOTSTRAP.md').is_file()
     status = 'FAIL' if checked['status'] == 'FAIL' else 'UNVERIFIED'
     return result('preflight', status, 'local_files_and_self_reported_evidence_only',
                   '필수 파일·기록·검토 후보를 확인했습니다. 에디터 저장과 실제 제출은 직접 확인해야 합니다.',
                   required_checks=checked['details']['checks'],
+                  file_check_status=checked['details']['file_check_status'],
+                  functional_status='UNVERIFIED',
                   requirements_supplied=bool(required), inventory_truncated=inspected['details']['truncated'],
                   inventory_limitations=inspected['details']['limitations'],
                   other_files_count=len(set(files) - set(required)),
                   review_candidates=candidates[:30], review_candidates_truncated=len(candidates) > 30,
                   nested_toolkit_candidate=tool_inside,
+                  executing_toolkit_inside_task=running_inside,
+                  executing_toolkit_path=str(own_repo),
                   internal_tool_state_dir_present=(root / '.ai-task-kit').is_dir(),
                   worklog_exists=exists, worklog=overview,
                   editor_save_confirmed=False, functional_tests_executed_by_tool=False,
@@ -838,6 +855,20 @@ def emit(report: dict, as_json: bool):
         print(f"[{report['status']}] {report['summary']}")
         print(f"검사 범위: {report['scope']}")
         details = dict(report['details'])
+        if report['command'] in {'verify', 'preflight'}:
+            label = {'PASS': '정상', 'FAIL': '실패', 'UNVERIFIED': '미검증'}
+            file_status = details['file_check_status']
+            print(f'파일 검사: {label[file_status]} (지정한 파일의 존재·형식 검사 범위만)')
+            print('실제 기능 검사: 이 도구에서는 수행하지 않음')
+            if file_status == 'PASS':
+                print('다음 작업: 과제의 실행·테스트 명령으로 기능 확인. 저장·제출은 직접 확인하세요.')
+            else:
+                print('다음 작업: 필수 파일 지정과 아래 파일별 실패·검사 제한을 확인한 뒤 실제 기능을 검사하세요.')
+        if report['command'] == 'preflight':
+            if details['executing_toolkit_inside_task']:
+                print('주의: 실행 중인 보조 도구가 과제 폴더 안에 있습니다. 아래 executing_toolkit_path와 실제 제출 목록을 확인하세요. 자동 이동·삭제하지 않습니다.')
+            elif details['nested_toolkit_candidate']:
+                print('주의: 과제 폴더 안에 ai-task-kit/BOOTSTRAP.md 후보가 있습니다. 실제 제출 목록을 확인하세요. 자동 이동·삭제하지 않습니다.')
         if isinstance(details.get('files'), list) and len(details['files']) > 30:
             details['files'] = details['files'][:30] + ['… 전체 목록은 --json으로 확인']
         rendered = json.dumps(details, ensure_ascii=False, indent=2, allow_nan=False, default=float)
