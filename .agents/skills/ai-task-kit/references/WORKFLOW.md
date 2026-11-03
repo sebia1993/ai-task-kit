@@ -6,7 +6,7 @@
 - 사용자가 실제로 확인한 답변과 실행 결과만 기록한다. `PASS`는 **사용자가 입력한 검증 결과 기록**이지 도구가 명령을 실행해서 확인한 PASS가 아니다.
 - `<SCRIPT>`는 `.agents/skills/ai-task-kit/scripts/taskkit.py`의 실제 경로로 바꾼다. `<TASK>`는 실제 과제 폴더다. 아래 파일명과 업무 조건은 설명용 가상 예시다.
 
-질문·AI 답변·선택 이유를 짧게 다시 읽고 싶다면 별도 선택 기능인 [개발 판단 기록](DEVELOPMENT_LOG.md)을 사용한다. 작업 AI가 작성하는 `.ai-task-kit/DEVELOPMENT_LOG.md`이며 CLI가 생성·갱신하지 않는다. MD 때문에 JSON을 중복 작성하지 않고, 이미 관련 기록이 있다면 ID만 연결할 수 있다. 아래 `status`·`preflight`의 기록 검사는 JSON 대상이며 MD의 내용·최신성을 검사하지 않는다.
+질문·AI 답변·선택 이유를 짧게 남기는 [개발 판단 기록](DEVELOPMENT_LOG.md)은 공통 Skill에서 기본 적용한다. 작업 AI가 작성하는 `.ai-task-kit/DEVELOPMENT_LOG.md`이며 CLI가 생성·갱신하지 않는다. 이 문서의 `worklog` JSON은 계속 선택 사항이다. MD 때문에 JSON을 중복 작성하지 않고, 이미 관련 기록이 있다면 ID만 연결할 수 있다. 아래 `status`·`preflight`의 기록 검사는 JSON 대상이며 MD의 내용·최신성을 검사하지 않는다.
 
 ## 1. 먼저 요구사항과 연결될 파일 지정
 
