@@ -41,15 +41,21 @@ description: Use when a user explicitly requests help inside an AI-permitted, ti
 **Cofa 공식 타이머의 남은 시간**과 필수 산출물의 실제 완성·검증 상태를 함께 보고 우선순위를 정한다. 핵심 기능의 검증·저장·제출 준비에 필요한 여유가 부족해지면 새 기능 확장을 멈춘다. 고정된 15분을 자동 종료 기준으로 사용하거나 자체 타이머를 만들지 않는다. 시험 규정·공식 타이머가 항상 우선하며, 시간이 부족해도 실패·미검증을 PASS로 바꾸지 않는다.
 
 ## 업무 질문·근거 기록 (필요한 경우에만)
-업무 기준이 모호하면 기존 지침을 확인하고, 결과가 달라질 조건만 담당자에게 물을 질문으로 정리한다. **실제로 받은 답변**만 반영하고 확인 필요 사항과 무관한 필수 기능은 계속 구현한다. [작업 기록 안내](references/WORKFLOW.md)의 `worklog`는 중요 판단이나 요구된 협업 기록이 필요할 때만 사용한다. 작은 변경마다 기록하지 않으며, 기록은 `.ai-task-kit/worklog.json`에만 로컬 저장한다. 담당자에게 질문을 대신 전송하거나 검증 명령을 실행하지 않는다.
+업무 기준이 모호하면 기존 지침을 확인하고, 결과가 달라질 조건만 담당자에게 물을 질문으로 정리한다. **실제로 받은 답변**만 반영하고 확인 필요 사항과 무관한 필수 기능은 계속 구현한다. [작업 기록 안내](references/WORKFLOW.md)의 `worklog`는 중요 판단이나 요구된 협업 기록이 필요할 때만 사용한다. 작은 변경마다 기록하지 않으며, 이 CLI 기록은 `.ai-task-kit/worklog.json`에만 로컬 저장한다. 담당자에게 질문을 대신 전송하거나 검증 명령을 실행하지 않는다.
 
 `worklog evidence --outcome PASS`는 사람이 입력한 주장이다. 파일 해시가 같아도 실제 기능 테스트를 대신하지 않는다. 파일이 바뀌면 재검증하고, 계획·협업 기록 등 **제출을 요구한 문서**는 과제에서 지정한 파일명과 형식으로 별도 작성한다.
 
 웹 서비스 과제일 때만 [Cofa Browser·서버 확인 안내](references/COFA_WEB.md)를 읽고 기존 서버 실행 명령·포트·바인딩·경로를 확인한다. 외부 접속 경로나 보안 우회 방법을 만들지 않는다.
 
+## 간결한 개발 판단 기록 (요청한 경우에만)
+
+사용자가 기록을 요청하면 [기록 안내](references/DEVELOPMENT_LOG.md)와 [빈 양식](assets/DEVELOPMENT_LOG_TEMPLATE.md)을 한 번 읽고, 허용된 `<TASK>/.ai-task-kit/DEVELOPMENT_LOG.md`를 작업 AI가 작성한다. 중요한 질문·답변, 선택·주체·이유, 구현 위치, 실제 검증 근거와 한계만 남긴다. 상단 요약 최대 5개 항목, 판단별 6개 짧은 항목을 사용하고 자잘한 대화·편집은 생략한다.
+
+한 번 요청받으면 중요한 판단·검증 상태 변경과 인계 때 갱신하며 같은 작성 승인을 반복해서 묻지 않는다. AI 제안과 사용자 명시 결정, 실행 관찰과 사용자 확인 보고를 구분한다. 확인하지 못한 과거 대화·선택 이유·성공 결과는 만들지 않는다. 정정은 이전 항목과 연결하고 실제 기록은 공개 KIT에 넣지 않는다. 기존 현황 보고에는 별도 파일이 필요 없으며, MD를 위해 `worklog`를 중복 호출하지 않는다. 기록을 작성했다는 이유로 검증 완료 수를 올리지 않는다.
+
 ## 최초 로드의 출처·버전 — 응답에 최초 한 번만
 - 응시 환경에서 실제로 확인한 **KIT 위치 기준 지침 파일 경로**와 파일 읽기 성공·실패 여부를 구분한다. `docs/EXAM_PROMPT_PLAYBOOK.md`가 실제로 읽히지 않았으면 적용한 P번호가 있다고 쓰지 않는다.
-- Git 체크아웃이고 읽기 명령이 허용된다면 최초 한 번만 `git -C "<KIT>" rev-parse --verify HEAD`로 실제 HEAD SHA를, `git -C "<KIT>" status --porcelain -- BOOTSTRAP.md .agents/skills/ai-task-kit/SKILL.md docs/EXAM_PROMPT_PLAYBOOK.md docs/prompts`로 상세 파일까지 변경 여부를 확인한다. 명령이 실패하거나 불허되면 커밋 또는 변경 상태를 **미확인**으로 표기한다. 이 확인이 실제 과제 작업보다 우선하지 않는다.
+- Git 체크아웃이고 읽기 명령이 허용된다면 최초 한 번만 `git -C "<KIT>" rev-parse --verify HEAD`로 실제 HEAD SHA를, `git -C "<KIT>" status --porcelain -- BOOTSTRAP.md .agents/skills/ai-task-kit/SKILL.md docs/EXAM_PROMPT_PLAYBOOK.md docs/prompts .agents/skills/ai-task-kit/references .agents/skills/ai-task-kit/assets`로 상세 파일·참고 안내·양식까지 변경 여부를 확인한다. 명령이 실패하거나 불허되면 커밋 또는 변경 상태를 **미확인**으로 표기한다. 이 확인이 실제 과제 작업보다 우선하지 않는다.
 - 최초 보고 예시: `초기 로드: docs/EXAM_PROMPT_PLAYBOOK.md | 커밋: <실제 확인 SHA 또는 미확인> | 지침 파일 변경: 없음/있음/미확인`. 관련 파일 내용이 Git HEAD와 다르다면 HEAD 값만으로 플레이북 내용을 보증하지 않는다. Git 버전 확인에 불필요한 시간을 쓰지 않는다.
 - 이 출처 정보는 **최초 로드에만** 보고한다. 매번 다시 Git 명령을 실행하거나 커밋 문자열을 반복해서 출력하지 않는다. 세션이 끊겼다면 기존 확인 결과를 확실히 인계받지 못한 경우 재확인하거나 미확인으로 보고한다.
 

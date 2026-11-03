@@ -53,7 +53,7 @@ Git 저장소이고 명령이 허용된 경우에만 다음을 실행합니다. 
 
 ~~~bash
 git -C "<KIT>" rev-parse --verify HEAD
-git -C "<KIT>" status --porcelain -- BOOTSTRAP.md .agents/skills/ai-task-kit/SKILL.md docs/EXAM_PROMPT_PLAYBOOK.md docs/prompts
+git -C "<KIT>" status --porcelain -- BOOTSTRAP.md .agents/skills/ai-task-kit/SKILL.md docs/EXAM_PROMPT_PLAYBOOK.md docs/prompts .agents/skills/ai-task-kit/references .agents/skills/ai-task-kit/assets
 ~~~
 
 실제 확인한 SHA와 지침 파일 변경 여부만 **최초 한 번** 보고합니다. Git 명령 사용이 불가하면 미확인으로 표시합니다. 커밋 확인은 파일 내용을 읽었다는 증거가 아닙니다. 이후 상황 변경 때는 **새 지침 파일만 읽고** 같은 문서를 반복하지 않습니다. 파일 접근 차단이나 응시 규정이 우선합니다.

@@ -18,12 +18,14 @@ KIT는 이 `BOOTSTRAP.md`가 있는 도구 폴더의 **실제 절대 경로**, T
 - 같은 오류 2회 실패 또는 약 5분간 해결이 안 되면 동일 시도를 멈추고 원인·접근 방법을 바꿉니다. 다른 독립적인 필수 작업을 먼저 진행할 수 있는지도 확인합니다. 결과를 바꾸는 업무 판단·파괴적 변경·플랫폼 권한 승인만 사용자에게 확인합니다.
 - `audit`·`worklog`·`retry`는 필요한 경우에만 사용합니다. 검사 도구는 과제 코드나 제출을 자동 실행하지 않습니다. 공식 타이머만 참조하며 별도의 타이머를 만들지 않습니다.
 
+사용자가 **간결한 개발 판단 기록**을 요청했다면 [기록 안내](.agents/skills/ai-task-kit/references/DEVELOPMENT_LOG.md)를 한 번 읽고 허용된 TASK에 작성합니다. 중요한 선택·실제 검증 결과만 갱신하며 대화 전문은 저장하지 않습니다. 아래 개발 현황 보고에는 추가 파일이 필요 없고, 요청된 판단 기록은 별도의 선택 기능입니다.
+
 ## 3. 최초 로드 출처 — 가능할 때만 한 번
 실제 KIT에서 읽기 명령이 허용되는 Git 체크아웃이라면 다음 두 **조회 명령**으로 SHA와 지침 파일 변경 여부를 확인합니다. 과제 시작을 지연하지 않으며 실패 시 **미확인**으로 기록합니다.
 
 ~~~bash
 git -C "<KIT>" rev-parse --verify HEAD
-git -C "<KIT>" status --porcelain -- BOOTSTRAP.md .agents/skills/ai-task-kit/SKILL.md docs/EXAM_PROMPT_PLAYBOOK.md docs/prompts
+git -C "<KIT>" status --porcelain -- BOOTSTRAP.md .agents/skills/ai-task-kit/SKILL.md docs/EXAM_PROMPT_PLAYBOOK.md docs/prompts .agents/skills/ai-task-kit/references .agents/skills/ai-task-kit/assets
 ~~~
 
 실제 확인한 값만 `초기 로드: docs/EXAM_PROMPT_PLAYBOOK.md(색인) | 커밋: <확인한 SHA/미확인> | 지침 파일 변경: 없음/있음/미확인`으로 **최초 1회** 보고합니다. 파일 읽기와 Git 버전 확인은 별개이며, Git SHA만으로 읽기 성공을 주장하지 않습니다. 세션이 끊겨 읽기 근거가 사라졌다면 필요한 파일만 다시 확인합니다.
